@@ -7,8 +7,7 @@
 3. [Run GGCNN in Gazebo and RVIZ](#3.0)
 4. [Sending commands through the action server](#4.0)
 5. [Connecting with real UR5](#5.0)
-6. [Meetings minutes](#6.0)
-7. [To do](#7.0)
+6. [To do](#7.0)
 
 ------------
 
@@ -151,22 +150,6 @@ Set up a connection on Ubuntu according to the following figure
 ![config_ethernet2](https://user-images.githubusercontent.com/28100951/71323962-fe29f880-24b7-11ea-86dc-756729932de4.jpg)
 
 <a name="6.0"></a>
-### 6.0 Meetings minutes
-#### Meeting - 25/11/2019
-Topics covered:
-1. Preferably use devices already in the lab, such as UR5, Intel Realsense and Gripper 2-Fingers Robotiq
-2. Check how to use neural networks to predict the position of objects. Thus, the proposed method would be robust against camera limitations regarding the proximity of the object, that is, even if there is no depth information, the neural network would use past data to predict where the object is at the given moment.
-3. Search for grasping applications.
-4. Translate the thesis into English
-
-<a name="7.0"></a>
-### 7.0 To do
-#### March/20
-- [x] Test realsense post-processing to enhance depth images - librealsense/examples/post-processing
-- [x] Record a rosbag file of the realsense depth cam
-- [x] Set the right position for the object detected frame
-- [x] Test the goal position using UR5
-- [x] Implement Robotiq gripper and force control
-
+### 6.0 To do
 #### April/20
-- [] Update realsense-ros to the new version
+- [] TBD
