@@ -1,0 +1,94 @@
+<?xml version="1.0"?>
+<launch>
+  <arg name="world_name" default="$(find gazebo_ros)/launch/empty_world.launch"/>
+  <arg name="paused" default="true" doc="Starts gazebo in paused mode" />
+  <arg name="gui" default="true" doc="Starts gazebo gui" />
+
+  ########################################
+  # Load UR5 URDF
+  ########################################
+  <param name="robot_description" command="$(find xacro)/xacro --inorder '$(find real-time-grasp)/urdf/ur5_with_cam.urdf.xacro'" />
+
+  ########################################
+  # Load Robot Description - GAZEBO
+  ########################################
+
+  <!-- include gazebo_ros launcher -->
+  <include file="$(find gazebo_ros)/launch/empty_world.launch">
+    <arg name="world_name" default="worlds/empty.world"/>
+    <arg name="paused" value="$(arg paused)"/>
+    <arg name="gui" value="$(arg gui)"/>
+  </include>
+
+  <node pkg="real-time-grasp" type="spawn_model.py" name="spawn_gazebo_models"/>
+    
+  <!-- push robot_description to factory and spawn robot in gazebo x = 1.90 y = -2.40, z = 0.875-->
+  <node name="spawn_robot"
+        pkg="gazebo_ros"
+        type="spawn_model"
+        args="-model robot
+              -param robot_description
+              -urdf
+              -x 0
+              -y 0
+              -z 1.015
+              -Y 1.57
+              -unpause"
+        respawn="false"
+        output="screen" />  
+
+  ########################################
+  # Load Parameters
+  ########################################
+  <!-- Load joint names into the parameter server -->
+  <rosparam file="$(find real-time-grasp)/config/joint_names.yaml" command="load" />
+  
+  <!-- Launch GGCNN parameters -->
+  <group ns="GGCNN">
+    <rosparam file="$(find real-time-grasp)/config/ggcnn_param.yaml" />
+  </group>
+
+  ########################################
+  # Load Gripper Controllers
+  ########################################
+  <!-- Load Robotiq Gripper Controller -->
+  <rosparam file="$(find real-time-grasp)/controller/ur5gripper_controllers.yaml"
+            command="load"/>
+
+  <node name="gripper_controller_spawner"
+        pkg="controller_manager"
+        type="spawner"
+        args="gripper_controller_vel"/>
+
+  
+  ########################################
+  # Load UR5 Controllers
+  # load velocity and position controllers
+  ########################################
+  <rosparam file="$(find real-time-grasp)/controller/ur5_controllers.yaml"
+            command="load"/>
+
+  <include file="$(find ur_gazebo)/launch/controller_utils.launch"/>
+
+  <!-- LOAD CONTROLLERS AND RUN -->
+  <arg name="controllers"
+       default="pos_based_pos_traj_controller"/>
+
+  <node name="ros_control_controller_spawner"
+        pkg="controller_manager"
+        type="spawner"
+        respawn="false"
+        output="screen"
+        args="$(arg controllers)" />
+
+  <!-- LOAD CONTROLLERS IN STOP MODE -->
+  <arg name="stopped_controllers"
+       default="joint_group_vel_controller"/>
+
+  <node name="ros_control_controller_manager"
+        pkg="controller_manager"
+        type="controller_manager"
+        respawn="false"
+        output="screen"
+        args="load $(arg stopped_controllers)" />
+</launch>

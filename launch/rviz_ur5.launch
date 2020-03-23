@@ -1,0 +1,67 @@
+<?xml version="1.0"?>
+<launch>
+  <!-- <arg name="sim" default="false" /> -->
+  <arg name="limited" default="false"/>
+  <arg name="debug" default="false"/>
+  <arg name="config" default="true"/>
+  <!-- The name of the parameter under which the URDF is loaded -->
+  <arg name="robot_description" default="robot_description"/>
+
+  <!-- from moveit_rviz.launch -->
+  <arg unless="$(arg debug)" name="launch_prefix" value=""/>
+  <arg if="$(arg debug)" name="launch_prefix" value="gdb --ex run --args"/>
+
+  <!-- move_group settings -->
+  <arg name="allow_trajectory_execution" default="true"/>
+  <arg name="fake_execution" default="false"/>
+  <arg name="max_safe_path_cost" default="1"/>
+  <arg name="jiggle_fraction" default="0.05"/>
+  <arg name="publish_monitored_planning_scene" default="true"/>
+  
+  <arg unless="$(arg config)" name="command_args" value=""/>
+  <arg if="$(arg config)" name="command_args" value="-d $(find real-time-grasp)/launch/moveit.rviz"/>
+
+  <!-- Load UR5 URDF / if the table is loaded, the high should be set to 0.84-->
+  <!-- <param name="robot_description"
+         command="$(find xacro)/xacro inorder '$(find real-time-grasp)/urdf/ur5_with_cam.urdf.xacro'
+                  robot_pose:=0.0
+                  load_table:=false"/> -->
+  <!-- Load UR5 URDF -->
+  <param name="robot_description" command="$(find xacro)/xacro --inorder '$(find real-time-grasp)/urdf/ur5_with_cam.urdf.xacro'" />
+
+  <!-- The semantic description that corresponds to the URDF -->
+  <param name="$(arg robot_description)_semantic" textfile="$(find real-time-grasp)/config/ur5.srdf"/>
+
+  <!-- from moveit_rviz.launch -->
+  <node name="$(anon rviz)" launch-prefix="$(arg launch_prefix)" pkg="rviz" type="rviz" respawn="false" args="$(arg command_args)" output="screen">
+    <rosparam command="load" file="$(find ur5_moveit_config)/config/kinematics.yaml"/>
+  </node>
+
+  <node name="move_group" launch-prefix="$(arg launch_prefix)" pkg="moveit_ros_move_group" type="move_group" respawn="false" output="screen" args="$(arg command_args)">
+    <env name="DISPLAY" value="$(optenv DISPLAY :0)"/>
+
+    <param name="allow_trajectory_execution" value="$(arg allow_trajectory_execution)"/>
+    <param name="max_safe_path_cost" value="$(arg max_safe_path_cost)"/>
+    <param name="jiggle_fraction" value="$(arg jiggle_fraction)"/>
+
+    <param
+      name="capabilities"
+      value="move_group/MoveGroupCartesianPathService
+				      move_group/MoveGroupExecuteTrajectoryAction
+				      move_group/MoveGroupKinematicsService
+				      move_group/MoveGroupMoveAction
+				      move_group/MoveGroupPickPlaceAction
+				      move_group/MoveGroupPlanService
+				      move_group/MoveGroupQueryPlannersService
+				      move_group/MoveGroupStateValidationService
+				      move_group/MoveGroupGetPlanningSceneService
+				      move_group/ClearOctomapService
+				      "/>
+
+    <param name="planning_scene_monitor/publish_planning_scene" value="$(arg publish_monitored_planning_scene)"/>
+    <param name="planning_scene_monitor/publish_geometry_updates" value="$(arg publish_monitored_planning_scene)"/>
+    <param name="planning_scene_monitor/publish_state_updates" value="$(arg publish_monitored_planning_scene)"/>
+    <param name="planning_scene_monitor/publish_transforms_updates" value="$(arg publish_monitored_planning_scene)"/>
+  </node>
+
+</launch>

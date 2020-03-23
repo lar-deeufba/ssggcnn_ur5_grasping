@@ -1,0 +1,9 @@
+crop_size: 300
+FOV: 62 # 55 for simulated / 
+camera_topic_info: "/camera/depth/camera_info"
+camera_topic: "/camera/depth/image_raw"
+camera_topic_realsense: "/camera/depth/image_rect_raw"
+
+# Check FOV in https://www.intel.com/content/dam/support/us/en/documents/emerging-technologies/intel-realsense-technology/Intel-RealSense-D400-Series-Datasheet.pdf
+# pag. 51 in Depth FOV VGA (degrees) - Consider vertical VGA FOV
+# Min depth for D435 = 175mm

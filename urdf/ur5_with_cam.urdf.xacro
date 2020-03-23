@@ -1,0 +1,174 @@
+<?xml version="1.0"?>
+<robot xmlns:xacro="http://wiki.ros.org/xacro" name="ur5">
+
+  <xacro:arg name="transmission_hw_interface" default="hardware_interface/PositionJointInterface"/>
+  <xacro:arg name="robot_pose" default="0.0"/>
+  <xacro:arg name="load_table" default="false"/>
+
+  <!-- Gazebo plugin -->
+  <xacro:include filename="$(find real-time-grasp)/urdf/plugin.gazebo.xacro"/>
+
+  <!-- Robotiq gripper -->
+  <xacro:include filename="$(find robotiq_description)/urdf/robotiq_85_gripper.urdf.xacro"/>
+
+  <!-- ur5 -->
+  <xacro:include filename="$(find real-time-grasp)/urdf/ur5.urdf.xacro"/>
+
+  <!-- It is necessary to change the hardware interface on the fly -->
+  <xacro:include filename="$(find real-time-grasp)/urdf/ur5.transmission.xacro"/>
+
+  <xacro:include filename="$(find real-time-grasp)/urdf/_d435.urdf.xacro" />
+
+  <!-- arm -->
+  <xacro:ur5_robot prefix="" joint_limited="false" transmission_hw_interface="$(arg transmission_hw_interface)"/>
+
+  <sensor_d435 parent="CAM_support_link">
+    <origin xyz="-0.0277 -0.002 -0.0075" rpy="0 0 0"/>
+  </sensor_d435>
+  
+  <link name="world"/>
+
+  <joint name="world_joint" type="fixed">
+    <parent link="world"/>
+    <child link="base_link"/>
+    <origin xyz="0.0 0.0 $(arg robot_pose)" rpy="0.0 0.0 0.0"/>
+  </joint>
+
+  <!-- Frame coincident with all-zeros TCP on UR controller -->
+  <xacro:property name="tool0_offset" value="0.15"/>
+
+  <link name="grasping_link"/>
+  <joint name="ur5_joint_grasping_frame" type="fixed">
+    <origin xyz="0 0 ${tool0_offset}" rpy="0 0 0"/>
+    <parent link="tool0"/>
+    <child link="grasping_link"/>
+  </joint>
+
+  <!-- This frame is placed in the same position as the box inserted in Gazebo in order to be visualized in RVIZ (just for comparison) -->
+  <link name="reference_link"/>
+  <joint name="reference_frame" type="fixed">
+    <origin xyz="-0.5 0.1 0.05" rpy="0 0 -0.6"/>
+    <parent link="base_link"/>
+    <child link="reference_link"/>
+  </joint>
+
+  <!-- CAM SUPPORT CODE -->
+
+  <!-- o wrist 2 fica 0.09465 m abaixo de wrist 3 (-0.0445+0.09465)-->
+  <!-- Its position is relative to its own (Caution: treat as inverse direction)-->
+  <!-- Its orientation is relative to the previous frame -->
+  <link name="CAM_support_link">
+    <visual>
+      <!-- The cam is rotated 14 degrees (0.24rad) through the yaw axis -->
+      <origin rpy="${1.57 - 0.244} ${3.14} -1.57" xyz="${0.002 - 0.03} ${-0.023 + 0.03 - 0.01} ${0.13915-0.205}"/>
+      <geometry>
+        <mesh filename="package://real-time-grasp/models/cam_support/CAM_support.STL" scale="0.001 0.001 0.001"/>
+      </geometry>
+      <material name="Cyan">
+        <color rgba="0.91 0.91 0.88 1.0"/>
+      </material>
+    </visual>
+  </link>
+
+  <joint name="CAM_support_joint" type="fixed">
+    <!-- Its position is relative to the previous link -->
+    <!-- Its orientation is relative to its own frame -->
+    <origin rpy="0 ${0.244} 1.57" xyz="${-0.021 + 0.03 - 0.01} ${-0.027 + 0.03 + 0.015} ${0.205 - 0.0086}"/>
+    <parent link="wrist_2_link"/>
+    <child link="CAM_support_link"/> 
+  </joint>
+
+  <!-- REALSENSE CODE -->
+
+  <link name="d435_realsense"/>
+
+  <joint name="wrist3_camera" type="fixed">
+    <parent link="wrist_3_link"/>
+    <child link="d435_realsense"/>
+    <origin xyz="0.0 0.0 0.0" rpy="0.0 0.0 0.0"/>
+  </joint>
+
+  <!-- GAZEBO ROBOTIQ CODE -->
+
+  <link name="robotiq_coupler">
+    <visual>
+      <geometry>
+        <mesh filename="package://robotiq_description/meshes/robotiq_85_coupler.stl"/>
+      </geometry>
+      <material name="flat_black"/>
+    </visual>
+    <collision>
+      <geometry>
+        <mesh filename="package://robotiq_description/meshes/robotiq_85_coupler.stl"/>
+      </geometry>
+    </collision>
+    <inertial>
+      <origin xyz="2.073e-05   1.45286e-03  -1.1049e-03" rpy="0 0 0"/>
+      <mass value="0.168"/>
+      <inertia ixx="6.69695624e-05" ixy="5.21511788e-09" ixz="-2.74383009e-08" iyy="7.85088161e-05" iyz="5.41105193e-07" izz="1.41819717e-04"/>
+    </inertial>
+  </link>
+
+  <joint name="robotiq_coupler_joint" type="fixed">
+    <origin xyz="0 0 0.004" rpy="0 0 ${-pi/2.0}"/>
+    <parent link="tool0"/>
+    <child link="robotiq_coupler"/>
+  </joint>
+
+  <gazebo reference="robotiq_coupler">
+    <mu1>0.9</mu1>
+    <mu2>0.9</mu2>
+    <material>Gazebo/FlatBlack</material>
+  </gazebo>
+
+  <xacro:robotiq_85_gripper prefix="" parent="robotiq_coupler">
+    <origin xyz="0 0 0.004" rpy="0 ${-pi/2} ${pi}"/>
+  </xacro:robotiq_85_gripper>
+
+  <gazebo reference="wrist_3_joint">
+    <provideFeedback>true</provideFeedback>
+  </gazebo>
+  <gazebo>
+    <plugin name="ft_sensor_plugin" filename="libgazebo_ros_ft_sensor.so">
+      <updateRate>250.0</updateRate>
+      <topicName>ft_sensor/raw</topicName>
+      <gaussianNoise>0.0</gaussianNoise>
+      <jointName>wrist_3_joint</jointName>
+    </plugin>
+  </gazebo>
+
+  <!-- <gazebo>
+    <gripper name="gazebo_gripper">
+      <grasp_check>
+        <attach_steps>5</attach_steps>
+        <detach_steps>10</detach_steps>
+        <min_contact_count>3</min_contact_count>
+      </grasp_check>
+      <gripper_link>robotiq_85_left_finger_tip_link</gripper_link>
+      <gripper_link>robotiq_85_right_finger_tip_link</gripper_link>
+      <palm_link>robotiq_85_base_link</palm_link>
+    </gripper>
+  </gazebo> -->
+
+
+  <!-- <gazebo>
+     
+    <plugin name="gazebo_grasp_fix" filename="libgazebo_grasp_fix.so">
+     <arm>
+        <arm_name>gazebo_gripper</arm_name>
+        <palm_link>robotiq_85_left_inner_knuckle_link</palm_link>
+        <gripper_link>robotiq_85_left_finger_tip_link</gripper_link>
+        <palm_link>robotiq_85_right_inner_knuckle_link</palm_link>
+        <gripper_link>robotiq_85_right_finger_tip_link</gripper_link>
+     </arm>
+     <forces_angle_tolerance>300</forces_angle_tolerance>
+     <update_rate>25</update_rate>
+     <grip_count_threshold>1</grip_count_threshold>
+     <max_grip_count>30</max_grip_count>
+     <release_tolerance>0.005</release_tolerance>
+     <disable_collisions_on_attach>false</disable_collisions_on_attach>
+     <contact_topic>/gazebo/default/physics/contacts</contact_topic>
+  </plugin>
+  </gazebo> -->
+
+</robot>

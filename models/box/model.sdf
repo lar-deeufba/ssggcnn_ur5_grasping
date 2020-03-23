@@ -1,0 +1,80 @@
+<?xml version="1.0" ?>
+<sdf version="1.5">
+  <model name="Custom box">
+    <static>false</static>
+    <link name="box_link">
+
+      <collision name="collision">
+        <geometry>
+          <mesh>
+            <uri>model://box/meshes/CUBE2.dae</uri>
+            <scale>0.5 1.0 1.0</scale>
+          </mesh>
+        </geometry>
+
+        <surface>
+          <bounce>
+            <restitution_coefficient>1</restitution_coefficient>
+            <threshold>1e+06</threshold>
+          </bounce>
+          <contact>
+            <collide_without_contact>0</collide_without_contact>
+            <collide_without_contact_bitmask>1</collide_without_contact_bitmask>
+            <collide_bitmask>1</collide_bitmask>
+            <ode>
+              <soft_cfm>0</soft_cfm>
+              <soft_erp>0.2</soft_erp>
+              <kp>1e+13</kp>
+              <kd>1</kd>
+              <max_vel>0.01</max_vel>
+              <min_depth>0</min_depth>
+            </ode>
+            <bullet>
+              <split_impulse>1</split_impulse>
+              <split_impulse_penetration_threshold>-0.01</split_impulse_penetration_threshold>
+              <soft_cfm>0</soft_cfm>
+              <soft_erp>0.2</soft_erp>
+              <kp>1e+13</kp>
+              <kd>1</kd>
+            </bullet>
+          </contact>
+          <friction>
+            <ode>
+              <mu>0.03</mu>
+              <mu2>0.03</mu2>
+            </ode>
+          </friction>
+        </surface>
+      </collision>
+
+      <visual name="visual">
+        <geometry>
+          <mesh>
+            <uri>model://box/meshes/CUBE2.dae</uri>
+            <scale>0.5 1.0 1.0</scale>
+          </mesh>
+        </geometry>
+        <material>
+          <script>
+            <uri>model://box/materials/scripts</uri>
+            <uri>model://box/materials/textures</uri>
+            <name>Box/Diffuse</name>
+          </script>
+        </material>
+      </visual>
+
+      <inertial>
+        <!-- <pose>0 0 0 0 0 0</pose> -->
+        <inertia>
+          <ixx>0.14*(0.058*0.058+0.033*0.033)/12</ixx>
+          <ixy>0.1</ixy>
+          <ixz>0.1</ixz>
+          <iyy>0.14*(0.026*0.026+0.033*0.033)/12</iyy>
+          <iyz>0.1</iyz>
+          <izz>0.14*(0.026*0.026+0.033*0.033)/12</izz>
+        </inertia>
+        <mass>0.14</mass>
+      </inertial>
+    </link>
+  </model>
+</sdf>
