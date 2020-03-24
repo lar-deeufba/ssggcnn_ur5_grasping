@@ -14,9 +14,6 @@ from pathlib import Path
 from tf import TransformListener
 from tf.transformations import quaternion_from_euler
 
-
-
-
 class Moving():
     def __init__(self, model_name, Spawning1, y_pose, x_pose, z_pose, oriFinal, path):
         self.pub_model = rospy.Publisher('gazebo/set_model_state', ModelState, queue_size=1)
@@ -52,15 +49,17 @@ class Moving():
 
 def main():
     rospack = rospkg.RosPack()
-    Home = rospack.get_path('real-time-grasp')
-    path_table = Home + '/models/table/model.sdf'
-    path_box = Home + '/models/box/model.sdf'
-
     rospy.init_node('spawn_model')
     Spawning1 = rospy.ServiceProxy("gazebo/spawn_sdf_model", SpawnModel)
     rospy.wait_for_service("gazebo/spawn_sdf_model")
-    model_coordinates = rospy.ServiceProxy(
-        '/gazebo/get_model_state', GetModelState)
+    model_coordinates = rospy.ServiceProxy('/gazebo/get_model_state', GetModelState)
+    
+    Home = rospack.get_path('real-time-grasp')
+
+    path_table = Home + '/models/table/model.sdf'
+    path_box = Home + '/models/box/model.sdf'
+    marker_bot = Home + '/models/markerbot/model.sdf'
+
     object_coordinates = model_coordinates("robot", "")
     z_position = object_coordinates.pose.position.z
     y_position = object_coordinates.pose.position.y
@@ -77,10 +76,17 @@ def main():
 
     rospy.sleep(0.2)
 
-    ptFinal = [0.1, -0.55, 0.2]    
-    oriFinal = quaternion_from_euler(0.0, 0.0, 2.0)
+    ptFinal = [0.0, -0.95, 0.165]    
+    oriFinal = quaternion_from_euler(1.57, 0.0, 1.57)
     moving2 = Moving("custom_box", Spawning1, x_position + ptFinal[0], y_position + ptFinal[1], z_position + ptFinal[2], oriFinal, path_box)
     moving2.spawning()
+
+    rospy.sleep(0.2)
+
+    ptFinal = [0.0, -0.95, 0.0]   
+    oriFinal = quaternion_from_euler(0.0, 0.0, 3.14)
+    moving3 = Moving("marker_bot", Spawning1, x_position + ptFinal[0], y_position + ptFinal[1], z_position + ptFinal[2], oriFinal, marker_bot)
+    moving3.spawning()
     
 if __name__ == '__main__':
     main()

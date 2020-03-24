@@ -21,7 +21,7 @@
   </include>
 
   <node pkg="real-time-grasp" type="spawn_model.py" name="spawn_gazebo_models"/>
-    
+      
   <!-- push robot_description to factory and spawn robot in gazebo x = 1.90 y = -2.40, z = 0.875-->
   <node name="spawn_robot"
         pkg="gazebo_ros"

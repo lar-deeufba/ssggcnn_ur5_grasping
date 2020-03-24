@@ -1,7 +1,7 @@
 <?xml version="1.0" ?>
 <sdf version="1.5">
   <model name="Custom box">
-    <static>false</static>
+    <static>true</static>
     <link name="box_link">
 
       <collision name="collision">
