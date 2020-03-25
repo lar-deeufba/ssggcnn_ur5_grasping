@@ -8,36 +8,21 @@ import copy
 import rosservice
 import sys
 
-from std_msgs.msg import Float64MultiArray, MultiArrayDimension, Header, ColorRGBA, Float32MultiArray
-from sensor_msgs.msg import JointState
-from trajectory_msgs.msg import JointTrajectory, JointTrajectoryPoint
-from control_msgs.msg import FollowJointTrajectoryAction, FollowJointTrajectoryGoal, GripperCommandAction, GripperCommandGoal
-from visualization_msgs.msg import Marker
-from geometry_msgs.msg import PoseStamped, Point, Vector3, Pose, TransformStamped, WrenchStamped
+from std_msgs.msg import Float64MultiArray, Float32MultiArray
 
 # Gazebo
 from gazebo_msgs.msg import ModelState, ModelStates, ContactState, LinkState
 from gazebo_msgs.srv import GetModelState, GetLinkState
 
 from tf import TransformListener, TransformerROS, TransformBroadcaster
-from tf.transformations import euler_from_quaternion, quaternion_from_euler, euler_from_matrix, quaternion_multiply
+from tf.transformations import euler_from_quaternion, quaternion_from_euler
 
-# import from moveit
-from moveit_python import PlanningSceneInterface
-
-# customized code
-from ur_inverse_kinematics import *
-sys.path.insert(1, '/home/vitu/real-time-grasp/src/ikfastpy')
-import ikfastpy
+# Inverse kinematics
 from trac_ik_python.trac_ik import IK
 
 # Robotiq
 # import roslib; roslib.load_manifest('robotiq_2f_gripper_control')
 from robotiq_2f_gripper_control.msg import _Robotiq2FGripper_robot_output  as outputMsg
-
-#from pyquaternion import Quaternion
-
-# tfBuffer = tf2_ros.Buffer()
 
 MOVE_GRIPPER = True
 CLOSE_GRIPPER_VEL = 0.05
@@ -57,24 +42,6 @@ def parse_args():
     parser.add_argument('--gazebo', action='store_true', help='Set the parameters related to the simulated enviroonment in Gazebo')
     args = parser.parse_args()
     return args
-
-def select(sols_found, desired_sol, w=[1]*6):
-    """Select the optimal solutions among a set of feasible joint value 
-       solutions.
-    Args:
-        sols_found: A set of feasible joint value solutions (unit: radian)
-        desired_sol: A list of desired joint value solution (unit: radian)
-        w: A list of weight corresponding to robot joints
-    Returns:
-        A list of optimal joint value solution.
-    """
-
-    error = []
-    for q in sols_found:
-        error.append(sum([w[i] * (q[i] - desired_sol[i]) ** 2 for i in range(6)]))
-    
-    return sols_found[error.index(min(error))]
-
 
 def turn_velocity_controller_on():
     rosservice.call_service('/controller_manager/switch_controller', [['joint_group_vel_controller'], ['pos_based_pos_traj_controller'], 1])
@@ -103,10 +70,6 @@ class vel_control(object):
         self.ori = None
         self.cmd_pub = rospy.Subscriber('ggcnn/out/command', Float32MultiArray, self.ggcnn_command, queue_size=1)
         
-        # visual tools from moveit
-        # self.scene = PlanningSceneInterface("base_link")
-        self.marker_publisher = rospy.Publisher('visualization_marker2', Marker, queue_size=1)
-
         # actionClient used to send joint positions
         self.client = actionlib.SimpleActionClient('pos_based_pos_traj_controller/follow_joint_trajectory', FollowJointTrajectoryAction)
         print "Waiting for server (pos_based_pos_traj_controller)..."
@@ -121,8 +84,7 @@ class vel_control(object):
         if self.args.gazebo:
             # Subscriber used to read joint values
             rospy.Subscriber('/joint_states', JointState, self.ur5_actual_position, queue_size=1)
-
-            self.pub_model = rospy.Publisher('/gazebo/set_link_state', LinkState, queue_size=1)
+           self.pub_model = rospy.Publisher('/gazebo/set_link_state', LinkState, queue_size=1)
             self.model = rospy.wait_for_message('gazebo/model_states', ModelStates)
             self.model_coordinates = rospy.ServiceProxy( '/gazebo/get_link_state', GetLinkState)
             self.wrench = rospy.Subscriber('/ft_sensor/raw', WrenchStamped, self.monitor_wrench, queue_size=1)
@@ -149,23 +111,8 @@ class vel_control(object):
     Calculate the initial robot position 
     """
     def get_ik(self, pose, ori = 'pick'):
-        ur5_kin = ikfastpy.PyKinematics()
-        n_joints = ur5_kin.getDOF()
 
-        if ori == 'place': 
-            # ee_ori_down = np.array([[-7.96325679e-04, -9.99999702e-01,  1.27050794e-06],
-            #                     [-9.99998391e-01,  7.96326727e-04,  1.59268081e-03],
-            #                     [-1.59268128e-03, -2.21323759e-09, -9.99998748e-01]])
-
-            # ee_pos_ori = np.hstack((ee_ori_down, np.array([[-1*pose[0]], [-1*pose[1]], [pose[2]]])))
-
-            # joint_configs = ur5_kin.inverse(ee_pos_ori.reshape(-1).tolist())
-            # n_solutions = int(len(joint_configs)/n_joints)
-            # joint_configs = np.asarray(joint_configs).reshape(n_solutions,n_joints)
-            
-            # # joint_configs[3 or 4] - upside down
-            # # print(joint_configs)
-            # return joint_configs[4]
+        if ori == 'place':
 
             ik_solver = IK("base_link", "tool0", solve_type="Manipulation2")
             seed_state = copy.deepcopy(self.actual_position)
@@ -177,45 +124,6 @@ class vel_control(object):
             return sol
 
         elif ori =='pick':
-
-            # matrix = TransformerROS()
-            # # The orientation of /tool0 will be constant
-            # q = quaternion_from_euler(1.57, 0, 1.57)
-
-            # # The 0.15 accounts for the distance between tool0 and grasping link
-            # # The final height will be the set_distance (from base_link)
-            # offset = 0.15
-            # matrix2 = matrix.fromTranslationRotation((pose[0]*(-1), pose[1]*(-1), pose[2] + offset), (q[0], q[1], q[2], q[3]))
-            # th = invKine(matrix2)
-            # sol1 = th[:, 2].transpose()
-            # joint_values_from_ik = np.array(sol1)
-            # joint_values = joint_values_from_ik[0, :]
-            # print(joint_values.tolist())
-            # return joint_values.tolist()
-
-
-            # ee_ori_up = np.array([[-7.64547964e-04, -5.88326938e-02,  9.98267591e-01],
-            #                       [-9.99998510e-01, -1.51129533e-03, -8.54941551e-04],
-            #                       [ 1.55897555e-03, -9.98266697e-01, -5.88314496e-02]])
-
-            # ee_pos_ori = np.hstack((ee_ori_up, np.array([[-1*pose[0]], [-1*pose[1]], [pose[2]]])))
-
-        
-            # joint_configs = ur5_kin.inverse(ee_pos_ori.reshape(-1).tolist())
-            # n_solutions = int(len(joint_configs)/n_joints)
-            # joint_configs = np.asarray(joint_configs).reshape(n_solutions,n_joints)
-            # # print(joint_configs)
-            
-            # # escolhida
-            # #  [-2.87468624 -1.63405895  1.6697408   0.02535371  1.83808398 -3.12701535]
-            # print(joint_configs)
-            
-            # best_sol = select(joint_configs, [-0.26652846, -1.61344349, -2.07331371,  0.48416376,  1.8359971,  -0.0175686])
-            # print("Joint_configs: ", joint_configs[5])
-            # print("Best sol: ", best_sol)
-
-            # return joint_configs[2]
-
 
             ik_solver = IK("base_link", "tool0", solve_type="Manipulation2")
             seed_state = copy.deepcopy(self.actual_position)
