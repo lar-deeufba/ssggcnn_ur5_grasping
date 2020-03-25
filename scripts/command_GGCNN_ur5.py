@@ -9,6 +9,10 @@ import rosservice
 import sys
 
 from std_msgs.msg import Float64MultiArray, Float32MultiArray
+from control_msgs.msg import FollowJointTrajectoryAction, FollowJointTrajectoryGoal
+from sensor_msgs.msg import JointState
+from trajectory_msgs.msg import JointTrajectory, JointTrajectoryPoint
+from geometry_msgs.msg import WrenchStamped
 
 # Gazebo
 from gazebo_msgs.msg import ModelState, ModelStates, ContactState, LinkState
@@ -78,13 +82,13 @@ class vel_control(object):
         rospy.sleep(1)
 
         self.initial_traj_duration = 5.0
-        self.final_traj_duration = 500.0
+        self.final_traj_duration = 1000.0
 
         # Gazebo topics
         if self.args.gazebo:
             # Subscriber used to read joint values
             rospy.Subscriber('/joint_states', JointState, self.ur5_actual_position, queue_size=1)
-           self.pub_model = rospy.Publisher('/gazebo/set_link_state', LinkState, queue_size=1)
+            self.pub_model = rospy.Publisher('/gazebo/set_link_state', LinkState, queue_size=1)
             self.model = rospy.wait_for_message('gazebo/model_states', ModelStates)
             self.model_coordinates = rospy.ServiceProxy( '/gazebo/get_link_state', GetLinkState)
             self.wrench = rospy.Subscriber('/ft_sensor/raw', WrenchStamped, self.monitor_wrench, queue_size=1)
