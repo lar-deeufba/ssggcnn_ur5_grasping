@@ -23,9 +23,12 @@ mv ../../robotiq ../../robotiq_gaz
 echo '###### Cloning the robotiq package ######'
 git clone https://github.com/ros-industrial/robotiq ../../robotiq
 
-echo '###### Cloning the plotJuggler package ######'
-git clone https://github.com/facontidavide/PlotJuggler ../../PlotJuggler
-sudo apt-get install ros-kinetic-plotjuggler 
+echo '###### Cloning the track_ik package ######'
+git clone https://bitbucket.org/traclabs/trac_ik.git ../../track_ik
+
+# echo '###### Cloning the plotJuggler package ######'
+# git clone https://github.com/facontidavide/PlotJuggler ../../PlotJuggler
+# sudo apt-get install ros-kinetic-plotjuggler 
 
 echo '###### Installing ros-kinetic-moveit ######'
 sudo apt-get install ros-kinetic-moveit
@@ -61,7 +64,6 @@ else
     make
 fi
 
-echo $PWD
 echo '###### Cloning the cob_gazebo_plugins package ######'
 git clone https://github.com/ipa320/cob_gazebo_plugins ../../cob_gazebo_plugins
 cd ../../cob_gazebo_plugins/cob_gazebo_ros_control

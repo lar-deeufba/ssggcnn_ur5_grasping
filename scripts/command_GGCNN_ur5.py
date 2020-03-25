@@ -29,6 +29,7 @@ from moveit_python import PlanningSceneInterface
 from ur_inverse_kinematics import *
 sys.path.insert(1, '/home/vitu/real-time-grasp/src/ikfastpy')
 import ikfastpy
+from trac_ik_python.trac_ik import IK
 
 # Robotiq
 # import roslib; roslib.load_manifest('robotiq_2f_gripper_control')
@@ -74,65 +75,6 @@ def select(sols_found, desired_sol, w=[1]*6):
     
     return sols_found[error.index(min(error))]
 
-"""
-Calculate the initial robot position 
-"""
-def get_ik(pose, ori = 'front'):
-    ur5_kin = ikfastpy.PyKinematics()
-    n_joints = ur5_kin.getDOF()
-
-    if ori == 'down': 
-        ee_ori_down = np.array([[-7.96325679e-04, -9.99999702e-01,  1.27050794e-06],
-                            [-9.99998391e-01,  7.96326727e-04,  1.59268081e-03],
-                            [-1.59268128e-03, -2.21323759e-09, -9.99998748e-01]])
-
-        ee_pos_ori = np.hstack((ee_ori_down, np.array([[-1*pose[0]], [-1*pose[1]], [pose[2]]])))
-
-        joint_configs = ur5_kin.inverse(ee_pos_ori.reshape(-1).tolist())
-        n_solutions = int(len(joint_configs)/n_joints)
-        joint_configs = np.asarray(joint_configs).reshape(n_solutions,n_joints)
-        
-        # joint_configs[3 or 4] - upside down
-        # print(joint_configs)
-        return joint_configs[4]
-
-    elif ori =='front':
-
-        matrix = TransformerROS()
-        # The orientation of /tool0 will be constant
-        q = quaternion_from_euler(1.57, 0, 1.57)
-
-        # The 0.15 accounts for the distance between tool0 and grasping link
-        # The final height will be the set_distance (from base_link)
-        offset = 0.15
-        matrix2 = matrix.fromTranslationRotation((pose[0]*(-1), pose[1]*(-1), pose[2] + offset), (q[0], q[1], q[2], q[3]))
-        th = invKine(matrix2)
-        sol1 = th[:, 2].transpose()
-        joint_values_from_ik = np.array(sol1)
-        joint_values = joint_values_from_ik[0, :]
-        print(joint_values.tolist())
-        return joint_values.tolist()
-
-        # ee_ori_up = np.array([[-7.64547964e-04, -5.88326938e-02,  9.98267591e-01],
-        #                       [-9.99998510e-01, -1.51129533e-03, -8.54941551e-04],
-        #                       [ 1.55897555e-03, -9.98266697e-01, -5.88314496e-02]])
-
-        # ee_pos_ori = np.hstack((ee_ori_up, np.array([[-1*pose[0]], [-1*pose[1]], [pose[2]]])))
-
-    
-        # joint_configs = ur5_kin.inverse(ee_pos_ori.reshape(-1).tolist())
-        # n_solutions = int(len(joint_configs)/n_joints)
-        # joint_configs = np.asarray(joint_configs).reshape(n_solutions,n_joints)
-        # # print(joint_configs)
-        
-        # # escolhida
-        # #  [-2.87468624 -1.63405895  1.6697408   0.02535371  1.83808398 -3.12701535]
-        # print(joint_configs)
-        
-        # best_sol = select(joint_configs, [-0.26652846, -1.61344349, -2.07331371,  0.48416376,  1.8359971,  -0.0175686])
-        # print("Joint_configs: ", joint_configs[5])
-        # print("Best sol: ", best_sol)
-        # return best_sol
 
 def turn_velocity_controller_on():
     rosservice.call_service('/controller_manager/switch_controller', [['joint_group_vel_controller'], ['pos_based_pos_traj_controller'], 1])
@@ -142,27 +84,17 @@ def turn_position_controller_on():
     # rosservice.call_service('/controller_manager/switch_controller', [['pos_based_pos_traj_controller'], ['joint_group_vel_controller','gripper_controller'], 1])
 
 class vel_control(object):
-    def __init__(self, args, joint_values):
+    def __init__(self, args, joint_values = None):
         self.args = args
         self.joint_values_home = joint_values
 
         # Topic used to publish vel commands
         self.pub_vel = rospy.Publisher('/joint_group_vel_controller/command', Float64MultiArray,  queue_size=1)
 
-        # Topic used to control the gripper
-        # self.griper_pos = rospy.Publisher('/gripper/command', JointTrajectory,  queue_size=10)
-        # self.gripper_msg = JointTrajectory()
-        # self.gripper_msg.joint_names = ['robotiq_85_left_knuckle_joint']
-
-        # self.gripper_client = actionlib.SimpleActionClient("gripper_controller/gripper_cmd", GripperCommandAction)
-        # rospy.loginfo("Waiting for server (gripper_controller)...")
-        # self.gripper_client.wait_for_server()
-        # rospy.loginfo("Connected to server (gripper_controller)")
-
         self.joint_vels_gripper = Float64MultiArray()
         self.pub_vel_gripper = rospy.Publisher('/gripper_controller_vel/command', Float64MultiArray,  queue_size=1)
 
-        # Class attribute used to perform TF transformations
+        # Used to perform TF transformations
         self.tf = TransformListener()
 
         # GGCNN
@@ -183,7 +115,7 @@ class vel_control(object):
         rospy.sleep(1)
 
         self.initial_traj_duration = 5.0
-        self.final_traj_duration = 5.0
+        self.final_traj_duration = 500.0
 
         # Gazebo topics
         if self.args.gazebo:
@@ -212,7 +144,138 @@ class vel_control(object):
         # Denavit-Hartenberg parameters of UR5
         # The order of the parameters is d1, SO, EO, a2, a3, d4, d45, d5, d6
         self.ur5_param = (0.089159, 0.13585, -0.1197, 0.425, 0.39225, 0.10915, 0.093, 0.09465, 0.0823 + 0.15)
-    
+
+    """
+    Calculate the initial robot position 
+    """
+    def get_ik(self, pose, ori = 'pick'):
+        ur5_kin = ikfastpy.PyKinematics()
+        n_joints = ur5_kin.getDOF()
+
+        if ori == 'place': 
+            # ee_ori_down = np.array([[-7.96325679e-04, -9.99999702e-01,  1.27050794e-06],
+            #                     [-9.99998391e-01,  7.96326727e-04,  1.59268081e-03],
+            #                     [-1.59268128e-03, -2.21323759e-09, -9.99998748e-01]])
+
+            # ee_pos_ori = np.hstack((ee_ori_down, np.array([[-1*pose[0]], [-1*pose[1]], [pose[2]]])))
+
+            # joint_configs = ur5_kin.inverse(ee_pos_ori.reshape(-1).tolist())
+            # n_solutions = int(len(joint_configs)/n_joints)
+            # joint_configs = np.asarray(joint_configs).reshape(n_solutions,n_joints)
+            
+            # # joint_configs[3 or 4] - upside down
+            # # print(joint_configs)
+            # return joint_configs[4]
+
+            ik_solver = IK("base_link", "tool0", solve_type="Manipulation2")
+            seed_state = copy.deepcopy(self.actual_position)
+            q = quaternion_from_euler(0.0, -3.14, 0.0)
+            sol = list(ik_solver.get_ik([-0.26652846, -1.61344349, -2.07331371,  0.48416376,  1.8359971,  -0.0175686], 
+                             pose[0], pose[1], pose[2],  # X, Y, Z
+                             q[0], q[1], q[2], q[3]))  # QX, QY, QZ, QW
+            sol[-1] = 0.0
+            return sol
+
+        elif ori =='pick':
+
+            # matrix = TransformerROS()
+            # # The orientation of /tool0 will be constant
+            # q = quaternion_from_euler(1.57, 0, 1.57)
+
+            # # The 0.15 accounts for the distance between tool0 and grasping link
+            # # The final height will be the set_distance (from base_link)
+            # offset = 0.15
+            # matrix2 = matrix.fromTranslationRotation((pose[0]*(-1), pose[1]*(-1), pose[2] + offset), (q[0], q[1], q[2], q[3]))
+            # th = invKine(matrix2)
+            # sol1 = th[:, 2].transpose()
+            # joint_values_from_ik = np.array(sol1)
+            # joint_values = joint_values_from_ik[0, :]
+            # print(joint_values.tolist())
+            # return joint_values.tolist()
+
+
+            # ee_ori_up = np.array([[-7.64547964e-04, -5.88326938e-02,  9.98267591e-01],
+            #                       [-9.99998510e-01, -1.51129533e-03, -8.54941551e-04],
+            #                       [ 1.55897555e-03, -9.98266697e-01, -5.88314496e-02]])
+
+            # ee_pos_ori = np.hstack((ee_ori_up, np.array([[-1*pose[0]], [-1*pose[1]], [pose[2]]])))
+
+        
+            # joint_configs = ur5_kin.inverse(ee_pos_ori.reshape(-1).tolist())
+            # n_solutions = int(len(joint_configs)/n_joints)
+            # joint_configs = np.asarray(joint_configs).reshape(n_solutions,n_joints)
+            # # print(joint_configs)
+            
+            # # escolhida
+            # #  [-2.87468624 -1.63405895  1.6697408   0.02535371  1.83808398 -3.12701535]
+            # print(joint_configs)
+            
+            # best_sol = select(joint_configs, [-0.26652846, -1.61344349, -2.07331371,  0.48416376,  1.8359971,  -0.0175686])
+            # print("Joint_configs: ", joint_configs[5])
+            # print("Best sol: ", best_sol)
+
+            # return joint_configs[2]
+
+
+            ik_solver = IK("base_link", "tool0", solve_type="Manipulation2")
+            seed_state = copy.deepcopy(self.actual_position)
+            q = quaternion_from_euler(0.0, -1.57, 0.0)
+            sol = list(ik_solver.get_ik([-0.26652846, -1.61344349, -2.07331371,  0.48416376,  1.8359971,  -0.0175686], 
+                             pose[0], pose[1], pose[2],  # X, Y, Z
+                             q[0], q[1], q[2], q[3]))  # QX, QY, QZ, QW
+            sol[-1] = 0.0
+            return sol
+
+    """
+    Quintic polynomial trajectory
+    """
+    def traj_planner(self, cart_pos, movement, way_points_number = 10):
+        """
+        pp - Position points
+        vp - Velocity points
+        """
+        v0 = a0 = vf = af = 0
+        t0 = self.initial_traj_duration
+        tf = (t0 + self.final_traj_duration) / way_points_number # tf by way point
+        t = tf / 10 # for each movement
+        ta = tf / 10 # to complete each movement
+        a = [0.0]*6
+        pos_points, vel_points, acc_points = [0.0]*6, [0.0]*6, [0.0]*6
+        joint_pos = self.get_ik(cart_pos, movement)
+
+        goal = FollowJointTrajectoryGoal()
+        goal.trajectory = JointTrajectory()
+        goal.trajectory.joint_names = ['shoulder_pan_joint', 'shoulder_lift_joint',
+                                            'elbow_joint', 'wrist_1_joint', 'wrist_2_joint',
+                                            'wrist_3_joint']
+
+        for i in range(6):
+            q0 = self.actual_position[i]
+            qf = joint_pos[i]
+
+            b = np.array([q0,v0,a0,qf,vf,af]).transpose()
+            m = np.array([[1, t0, t0**2,   t0**3,    t0**4,    t0**5],
+                          [0,  1,  2*t0, 3*t0**2,  4*t0**3,  5*t0**4],
+                          [0,  0,     2,    6*t0, 12*t0**2, 20*t0**3],
+                          [1, tf, tf**2,   tf**3,    tf**4,    tf**5],
+                          [0,  1,  2*tf, 3*tf**2,  4*tf**3,  5*tf**4],
+                          [0,  0,     2,    6*tf, 12*tf**2, 20*tf**3]])
+            a[i] = np.linalg.inv(m).dot(b)
+
+        for i in range(way_points_number):
+            for j in range(6):
+                pos_points[j] =   a[j][0] +   a[j][1]*t +    a[j][2]*t**2 +    a[j][3]*t**3 +   a[j][4]*t**4 + a[j][5]*t**5
+                vel_points[j] =   a[j][1] + 2*a[j][2]*t +  3*a[j][3]*t**2 +  4*a[j][4]*t**3 + 5*a[j][5]*t**4
+                acc_points[j] = 2*a[j][2] + 6*a[j][3]*t + 12*a[j][4]*t**2 + 20*a[j][5]*t**3
+
+            goal.trajectory.points.append(JointTrajectoryPoint(positions = pos_points,
+                                                               velocities = vel_points,
+                                                               accelerations = acc_points,
+                                                               time_from_start = rospy.Duration(t))) #default 0.1*i + 5
+            t += ta
+
+        self.client.send_goal(goal)
+        # self.client.wait_for_result()
 
     """
     GGCNN Command Subscriber Callback
@@ -279,10 +342,8 @@ class vel_control(object):
     This method check if the goal position was reached
     """
     def all_close(self, goal, tolerance = 0.015):
-        angles_difference = [self.actual_position[i] - goal[i] for i in range(6)]
-        total_error = np.sum(angles_difference)
-
-        if abs(total_error) > tolerance:
+        error = np.sum([(self.actual_position[i] - goal[i])**2 for i in range(6)])
+        if error > tolerance:
             return False
 
         return True
@@ -330,35 +391,22 @@ class vel_control(object):
     """
     Control the gripper by using velocity controller
     """
-    def gripper_vel_control_close(self):
+    def gripper_vel_control(self, action):
         global MOVE_GRIPPER
 
         rate = rospy.Rate(125)
-        self.joint_vels_gripper.data = np.array([CLOSE_GRIPPER_VEL])
-        self.pub_vel_gripper.publish(self.joint_vels_gripper)
 
-        while not rospy.is_shutdown() and MOVE_GRIPPER and self.robotic < 0.6:
-            rate.sleep()
-
-        # stops the robot after the goal is reached
-        rospy.loginfo("Gripper stopped!")
-        print("Angle: ", self.robotic)
-        self.joint_vels_gripper.data = np.array([0.0])
-        self.pub_vel_gripper.publish(self.joint_vels_gripper)
-
-
-    """
-    Control the gripper by using velocity controller
-    """
-    def gripper_vel_control_open(self):
-        global MOVE_GRIPPER
-
-        rate = rospy.Rate(125)
-        self.joint_vels_gripper.data = np.array([OPEN_GRIPPER_VEL])
-        self.pub_vel_gripper.publish(self.joint_vels_gripper)
-        
-        while not rospy.is_shutdown() and MOVE_GRIPPER and self.robotic > 0.1:
-            rate.sleep()
+        if action == 'open':
+            print(np.array(OPEN_GRIPPER_VEL))
+            self.joint_vels_gripper.data = np.array([OPEN_GRIPPER_VEL])
+            self.pub_vel_gripper.publish(self.joint_vels_gripper)
+            while not rospy.is_shutdown() and MOVE_GRIPPER and self.robotic > 0.1:
+                rate.sleep()
+        elif action == 'close':
+            self.joint_vels_gripper.data = np.array([CLOSE_GRIPPER_VEL])
+            self.pub_vel_gripper.publish(self.joint_vels_gripper)
+            while not rospy.is_shutdown() and MOVE_GRIPPER and self.robotic < 0.6:
+                rate.sleep()
            
         # stops the robot after the goal is reached
         rospy.loginfo("Gripper stopped!")
@@ -400,17 +448,8 @@ class vel_control(object):
         # First point is current position
         try:
             self.goal.trajectory.points = [(JointTrajectoryPoint(positions=self.joint_values_home, velocities=[0]*6, time_from_start=rospy.Duration(self.initial_traj_duration)))]
-            if self.args.gazebo:
-                if not self.all_close(self.joint_values_home):
-                    print "'Homing' the robot."
-                    self.client.send_goal(self.goal)
-                    self.client.wait_for_result()
-                    while not self.all_close(self.joint_values_home):
-                        self.client.send_goal(self.goal)
-                        self.client.wait_for_result()
-            else:
-                self.client.send_goal(self.goal)
-                self.client.wait_for_result()
+            self.client.send_goal(self.goal)
+            self.client.wait_for_result()
         except KeyboardInterrupt:
             self.client.cancel_goal()
             raise
@@ -434,7 +473,7 @@ class vel_control(object):
                 if not self.all_close(joint_values):
                     self.client.send_goal(self.goal)
                     self.client.wait_for_result()
-                    while self.all_close(joint_values):
+                    while not self.all_close(joint_values):
                         self.client.send_goal(self.goal)
                         self.client.wait_for_result()
             else:
@@ -455,13 +494,14 @@ def main():
 
     # Turn position controller ON
     turn_position_controller_on()
-    joint_values_home = [0, -1.5707, 0, -1.5707, 1.5707, 0]
-    ur5_vel = vel_control(arg, joint_values_home)
+    ur5_vel = vel_control(arg)
+    ur5_vel.joint_values_home = ur5_vel.get_ik([-0.5, 0.0, 0.20], 'pick')
 
     # Send the robot to the custom HOME position
     raw_input("==== Press enter to 'home' the robot and open gripper!")
     rospy.on_shutdown(ur5_vel.home_pos)
-    ur5_vel.home_pos()
+    # ur5_vel.home_pos()
+    ur5_vel.set_pos_robot([0, -1.5707, 0, -1.5707, 1.5707, 0])
     if arg.gazebo:
         rospy.loginfo("Starting the gripper in Gazebo! Please wait...")
         ur5_vel.gripper_init()
@@ -476,16 +516,18 @@ def main():
     GRIPPER_INIT = False
 
     while not rospy.is_shutdown():
-        joint_angles = get_ik([-0.8, 0.0, 0.25], 'front')   
-        raw_input("==== Press enter to move the robot to the pre-grasp position!")
-        ur5_vel.set_pos_robot(joint_angles)
 
-        print("\n\n")
-        joint_angles = get_ik([-0.6, 0.0, 0.25], 'front')  
         raw_input("==== Press enter to move the robot to the pre-grasp position!")
-        ur5_vel.set_pos_robot(joint_angles)
-        print(ur5_vel.actual_position)
-        
+        ur5_vel.traj_planner([-0.5, -0.05, 0.20], 'pick')   
+                
+        # It will be replaced by the GGCNN position
+        # It is just to simulate the final position
+        raw_input("==== Press enter to move the robot to the grasp position!")
+        ur5_vel.traj_planner([-0.75, -0.05, 0.20], 'pick')  
+                        
+        # !!! GGCNN is not yet implemented to pick a object in the printer (makerbot)
+        #It closes the gripper before approaching the object
+        #It prevents the gripper to collide with other objects when grasping
         if not arg.gazebo:
             raw_input("==== Press enter to close the gripper to a pre-grasp position!")
             ur5_vel.command_gripper('p')
@@ -493,20 +535,22 @@ def main():
         raw_input("==== Press enter to move the robot to the goal position given by GGCNN!")
         ur5_vel.set_pos_robot(ur5_vel.joint_values_ggcnn)
 
+        # As the object iteraction in Gazebo is not working properly, the gripper only closes
+        # when using the real robot
         if not arg.gazebo:
             raw_input("==== Press enter to close the gripper!")
             print(ur5_vel.d[-2])
             ur5_vel.command_gripper('c')
 
         # Move the robot to put the object down after the robot is move backwards from the printer
+        # Need to be updated
         raw_input("==== Press enter to put the object down!")
-        joint_values_home = get_ik([-0.4, 0.11, 0.40], 'down')    
-        ur5_vel.set_pos_robot(joint_values_home)
+        ur5_vel.traj_planner([-0.6, 0.0, 0.25], 'place')   
 
         raw_input("==== Press enter to open the gripper!")
         if arg.gazebo:
             MOVE_GRIPPER = True    
-            ur5_vel.gripper_vel_control_open()
+            ur5_vel.gripper_vel_control('open')
         else:
             ur5_vel.command_gripper('o')
 

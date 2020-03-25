@@ -1,3 +1,7 @@
+<p align="center">
+<img src="https://user-images.githubusercontent.com/28100951/77494932-ec911d80-6e25-11ea-8fc7-1626af8a5212.png" width="600">
+</p>
+
 ------------
 
 <a id="top"></a>
@@ -16,7 +20,7 @@
 
 This repository was created in order to develop an improved version of the [GGCNN]((https://github.com/dougsm/ggcnn_kinova_grasping)) Grasp Method created by Doug Morrison (2018).
 
-> **_NOTE:_**  This package should be placed into your src folder
+> **_NOTE:_**  This package should be placed into your src folder. Please open an issue if you find any problem related to this package.
 
 <a name="2.0"></a>
 ### 2.0 Required packages - Kinetic Version
