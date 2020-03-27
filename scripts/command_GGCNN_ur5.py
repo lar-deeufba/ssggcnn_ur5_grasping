@@ -79,15 +79,15 @@ class vel_control(object):
         print "Waiting for server (pos_based_pos_traj_controller)..."
         self.client.wait_for_server()
         print "Connected to server (pos_based_pos_traj_controller)"
-        rospy.sleep(1)
-
+        
         self.initial_traj_duration = 5.0
         self.final_traj_duration = 1000.0
 
         # Gazebo topics
         if self.args.gazebo:
             # Subscriber used to read joint values
-            rospy.Subscriber('/joint_states', JointState, self.ur5_actual_position, queue_size=1)
+            rospy.Subscriber('/joint_states', JointState, self.ur5_actual_position, queue_size=2)
+            rospy.sleep(1)
             self.pub_model = rospy.Publisher('/gazebo/set_link_state', LinkState, queue_size=1)
             self.model = rospy.wait_for_message('gazebo/model_states', ModelStates)
             self.model_coordinates = rospy.ServiceProxy( '/gazebo/get_link_state', GetLinkState)

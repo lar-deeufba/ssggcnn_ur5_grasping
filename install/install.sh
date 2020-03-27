@@ -5,6 +5,21 @@
 #
 ####################################
 
+echo '###### Installing some controllers ######'
+# Install catkin tools
+sudo apt-get install ros-kinetic-catkin python-catkin-tools
+
+# Install some controllers
+sudo apt-get install ros-kinetic-joint-state-controller
+sudo apt-get install ros-kinetic-effort-controllers
+sudo apt-get install ros-kinetic-position-controllers
+sudo apt-get install ros-kinetic-gazebo-ros-pkgs ros-kinetic-gazebo-ros-control
+
+echo '###### Installing and upgrading pip | pathlib ######'
+sudo apt install python-pip
+pip install --upgrade pip
+pip install pathlib
+
 echo '###### Cloning the universal_robot package ######'
 git clone -b kinetic-devel https://github.com/ros-industrial/universal_robot ../../universal_robot
 
@@ -30,6 +45,9 @@ git clone https://bitbucket.org/traclabs/trac_ik.git ../../track_ik
 # git clone https://github.com/facontidavide/PlotJuggler ../../PlotJuggler
 # sudo apt-get install ros-kinetic-plotjuggler 
 
+echo '###### Cloning the openrave_catkin package ######'
+git clone https://github.com/personalrobotics/openrave_catkin ../../openrave_catkin
+
 echo '###### Installing ros-kinetic-moveit ######'
 sudo apt-get install ros-kinetic-moveit
 
@@ -38,7 +56,7 @@ sudo apt-get install ros-kinetic-gripper*controller
 
 echo '###### Cloning the realsense-ros package ######'
 sudo apt-get install ros-kinetic-realsense2-camera
-git clone https://github.com/IntelRealSense/realsense-ros --branch 2.2.11 ../../realsense-ros
+# git clone https://github.com/IntelRealSense/realsense-ros --branch 2.2.11 ../../realsense-ros
 
 echo '###### Cloning the realsense_gazebo_plugin package ######'
 git clone https://github.com/pal-robotics/realsense_gazebo_plugin ../../realsense_gazebo_plugin
