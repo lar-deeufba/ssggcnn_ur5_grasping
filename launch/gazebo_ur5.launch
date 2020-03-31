@@ -3,6 +3,7 @@
   <arg name="world_name" default="$(find gazebo_ros)/launch/empty_world.launch"/>
   <arg name="paused" default="true" doc="Starts gazebo in paused mode" />
   <arg name="gui" default="true" doc="Starts gazebo gui" />
+  <arg name="bico" default="false" doc="Starts gazebo gui" />
 
   ########################################
   # Load UR5 URDF
@@ -20,8 +21,14 @@
     <arg name="gui" value="$(arg gui)"/>
   </include>
 
-  <node pkg="real-time-grasp" type="spawn_model.py" name="spawn_gazebo_models"/>
-      
+  <group if="$(eval arg('bico') ==0)">
+    <node pkg="real-time-grasp" type="spawn_model.py" name="spawn_gazebo_models"/>
+  </group>
+
+  <group if="$(eval arg('bico') ==1)">
+    <node pkg="real-time-grasp" type="spawn_model_bico_dosador.py" name="spawn_gazebo_models"/>
+  </group>
+
   <!-- push robot_description to factory and spawn robot in gazebo x = 1.90 y = -2.40, z = 0.875-->
   <node name="spawn_robot"
         pkg="gazebo_ros"

@@ -111,11 +111,20 @@ class vel_control(object):
         # The order of the parameters is d1, SO, EO, a2, a3, d4, d45, d5, d6
         self.ur5_param = (0.089159, 0.13585, -0.1197, 0.425, 0.39225, 0.10915, 0.093, 0.09465, 0.0823 + 0.15)
 
-    """
-    Calculate the initial robot position 
-    """
     def get_ik(self, pose, ori = 'pick'):
-
+        """Get the inverse kinematics 
+        
+        Get the inverse kinematics of the UR5 robot using track_IK package giving a desired intial pose
+        
+        Arguments:
+            pose {list} -- A pose representing x, y and z
+        
+        Keyword Arguments:
+            ori {str} -- Define the final orientation of the robot (default: {'pick'})
+        
+        Returns:
+            {list} -- Joint angles or None if track_ik is not able to find a valid solution
+        """
         if ori == 'place':
 
             ik_solver = IK("base_link", "tool0", solve_type="Manipulation2")
@@ -430,12 +439,12 @@ def main():
     while not rospy.is_shutdown():
 
         raw_input("==== Press enter to move the robot to the pre-grasp position!")
-        ur5_vel.traj_planner([-0.5, -0.05, 0.20], 'pick')   
+        ur5_vel.traj_planner([-0.55, -0.01, 0.20], 'pick')   
                 
         # It will be replaced by the GGCNN position
         # It is just to simulate the final position
         raw_input("==== Press enter to move the robot to the grasp position!")
-        ur5_vel.traj_planner([-0.75, -0.05, 0.20], 'pick')  
+        ur5_vel.traj_planner([-0.75, -0.01, 0.20], 'pick')  
                         
         # !!! GGCNN is not yet implemented to pick a object in the printer (makerbot)
         #It closes the gripper before approaching the object
