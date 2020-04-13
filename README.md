@@ -25,6 +25,9 @@ This repository was created in order to develop an improved version of the [GGCN
 <a name="2.0"></a>
 ### 2.0 Required packages - Kinetic Version
 
+- mxnet
+- gluoncv
+
 > **_NOTE:_** Please access the grasp_project repository in order to check the required packages in the '2.0 Required packages' section. The same packages are used in this repository. You do not need to clone grasp_project repository.
 
 - [grasp_project](https://github.com/caiobarrosv/grasp_project) - Created by Caio Viturino

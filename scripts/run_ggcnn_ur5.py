@@ -116,13 +116,13 @@ def depth_callback(depth_message):
         depth_test_circle = depth.copy()
         
         height_res, width_res = depth.shape
-        # print("Height_res: ", height_res)
-        # print("Width_res: ", width_res)
+        print("Height_res: ", height_res)
+        print("Width_res: ", width_res)
         
         # It crops a 300x300 resolution square at the top of the depth image
         # depth[0:300, 170:470]
         depth_crop = depth[0 : crop_size, (width_res - crop_size)//2 : (width_res - crop_size)//2 + crop_size]
-        
+
         # Creates a deep copy of the depth_crop image
         depth_crop = depth_crop.copy()
 
@@ -363,14 +363,14 @@ def depth_callback(depth_message):
         object_ori = euler_from_quaternion(object_ori)
 
         br.sendTransform((object_pose[0] + offset_x, 
-                          object_pose[1] + offset_y, 
+                          object_pose[1] + offset_y,
                           (object_pose[2] + offset_z)*angle_deviation), 
                           quaternion_from_euler(0.0, 0.0, object_ori[2]),
                           rospy.Time.now(),
                           "object_link",
                           "base_link")
 
-depth_sub = rospy.Subscriber(camera_topic, Image, depth_callback, queue_size=1)
+depth_sub = rospy.Subscriber("/camera/depth/image_raw", Image, depth_callback, queue_size=1)
 
 while not rospy.is_shutdown():
     rospy.spin()

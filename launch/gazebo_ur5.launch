@@ -55,6 +55,11 @@
     <rosparam file="$(find real-time-grasp)/config/ggcnn_param.yaml" />
   </group>
 
+  <group ns="SSD512">
+    <rosparam file="$(find real-time-grasp)/config/ssd_param.yaml" />
+  </group>
+
+
   ########################################
   # Load Gripper Controllers
   ########################################

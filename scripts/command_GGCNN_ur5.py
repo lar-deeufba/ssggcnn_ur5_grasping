@@ -439,7 +439,7 @@ def main():
     while not rospy.is_shutdown():
 
         raw_input("==== Press enter to move the robot to the pre-grasp position!")
-        ur5_vel.traj_planner([-0.55, -0.01, 0.20], 'pick')   
+        ur5_vel.traj_planner([-0.50, -0.01, 0.20], 'pick')   
                 
         # It will be replaced by the GGCNN position
         # It is just to simulate the final position
