@@ -1,6 +1,4 @@
 #! /usr/bin/env python
-# Copyright (c) 2018, Douglas Morrison, ARC Centre of Excellence for Robotic Vision (ACRV), Queensland University of Technology
-# All rights reserved.
 
 import time
 
@@ -45,14 +43,17 @@ rospy.init_node('ggcnn_detection')
 transf = TransformListener()
 br = TransformBroadcaster()
 
-# Load GGCN parameters
-crop_size = rospy.get_param("/GGCNN/crop_size")
-FOV = rospy.get_param("/GGCNN/FOV")
-camera_topic_info = rospy.get_param("/GGCNN/camera_topic_info")
+# Load GGCN and SSD512 parameters
+crop_size = rospy.get_param("/SSD512/crop_size")
+camera_topic_info = rospy.get_param("/SSD512/camera_topic_info")
+
 if args.real:
-    camera_topic = rospy.get_param("/GGCNN/camera_topic_realsense")
+    FOV = rospy.get_param("/SSD512/FOV")
+    camera_topic = rospy.get_param("/SSD512/camera_topic_realsense")
 else:
-    camera_topic = rospy.get_param("/GGCNN/camera_topic")
+    FOV = rospy.get_param("/SSD512/FOV_gazebo")
+    camera_topic = rospy.get_param("/SSD512/camera_topic_gazebo")
+    camera_topic_ssd = rospy.get_param("/SSD512/camera_topic_ssd512")
 
 # Output publishers.
 grasp_pub = rospy.Publisher('ggcnn/img/grasp', Image, queue_size=1)
@@ -162,11 +163,6 @@ class Server:
             # se depth_crop == 0, retorna 1 como inteiro.
             # Ou seja, copia os pixels pretos da imagem e a posicao deles
             mask = (depth_crop == 0).astype(np.uint8)
-
-            # from mvp repo
-            # kernel = np.ones((3, 3),np.uint8)
-            # mask = cv2.dilate(mask, kernel, iterations=1)
-            # depth_crop[mask==1] = 0
 
             # Scale to keep as float, but has to be in bounds -1:1 to keep opencv happy.
             # Copia o maior valor para depois realizar a escala
@@ -354,8 +350,7 @@ class Server:
 
             depth_pub.publish(bridge.cv2_to_imgmsg(depth_crop))
             ang_pub.publish(bridge.cv2_to_imgmsg(ang_out))
-
-            # -1 is multiplied by cmd_msg.data[3] because the object_detected frame is inverted
+            
             if args.real:
                 offset_x = -0.03 # 0.002
                 offset_y = 0.02 # -0.05
@@ -376,12 +371,13 @@ class Server:
             cmd_pub.publish(cmd_msg)
             # print("x: %.6s | y: %.6s | z: %.6s" % (cmd_msg.data[0], cmd_msg.data[1], cmd_msg.data[2]))        
 
-            # # The transformation between object_detected and base_link can be done way better with TF2
+            # The transformation between object_detected and base_link can be done way better with TF2
             br.sendTransform((0.0, 0.0, 0.0), quaternion_from_euler(angle_offset, 0.0, 0.0),
                              rospy.Time.now(),
                              "camera_depth_optical_frame_rotated",
                              "camera_depth_optical_frame")
 
+            # -1 is multiplied by cmd_msg.data[3] because the object_detected frame is inverted
             br.sendTransform((cmd_msg.data[0], 
                               cmd_msg.data[1], 
                               cmd_msg.data[2]), 
@@ -401,17 +397,12 @@ class Server:
                               "object_link",
                               "base_link")
 
-# depth_sub = rospy.Subscriber(camera_topic, Image, depth_callback, queue_size=1)
-
 def main():
     server = Server()
 
-    depth_ssd512 = rospy.Subscriber("/obj_img", Image, server.depth_ssd512_callback, queue_size=1)
-    depth_raw = rospy.Subscriber("/camera/depth/image_raw", Image, server.depth_raw_callback, queue_size=1)
+    depth_ssd512 = rospy.Subscriber(camera_topic_ssd, Image, server.depth_ssd512_callback, queue_size=1)
+    depth_raw = rospy.Subscriber(camera_topic, Image, server.depth_raw_callback, queue_size=1)
 
-    # while not rospy.is_shutdown():
-        # depth_callback(depth_ssd512, depth_raw)
-        # print(depth_ssd512.type)
     rospy.spin()
 
 if __name__ == '__main__':

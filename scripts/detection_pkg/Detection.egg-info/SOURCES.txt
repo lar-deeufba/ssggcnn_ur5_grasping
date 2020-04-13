@@ -1,0 +1,11 @@
+README.md
+setup.py
+Detection.egg-info/PKG-INFO
+Detection.egg-info/SOURCES.txt
+Detection.egg-info/dependency_links.txt
+Detection.egg-info/top_level.txt
+detection/Kinect.py
+detection/__init__.py
+detection/config.py
+detection/main.py
+detection/transforms.py

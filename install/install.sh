@@ -19,6 +19,9 @@ echo '###### Installing and upgrading pip | pathlib ######'
 sudo apt install python-pip
 pip install --upgrade pip
 pip install pathlib
+pip install mxnet
+pip install gluoncv
+pip install opencv-python
 
 echo '###### Cloning the universal_robot package ######'
 git clone -b kinetic-devel https://github.com/ros-industrial/universal_robot ../../universal_robot
