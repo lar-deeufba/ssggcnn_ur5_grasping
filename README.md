@@ -49,7 +49,7 @@ sudo chmod +x ./install.sh
 ./install.sh #without sudo
 ```
 
-### This repository also need the SSD512 implementation created by [czrcbl](https://github.com/czrcbl). Please follow the next procedures provided by him.
+#### This repository also need the SSD512 implementation created by [czrcbl](https://github.com/czrcbl). Please follow the next procedures provided by him.
 
 Wrapper for some object detection models trained on parts produced on a 3D printer.
 
@@ -64,6 +64,8 @@ git clone https://github.com/czrcbl/bboxes
 cd bboxes
 git install -e .
 ```
+
+[Download](https://drive.google.com/file/d/1NamkTraRxDBBKDzN5p5D1lCBShqOHp36/view?usp=sharing) the model2.params in the following link and move it to the `detection_pkg` folder.
 
 <a name="3.0"></a>
 ### 3.0 Run GGCNN and SSD512 in Gazebo and RVIZ
