@@ -125,18 +125,20 @@
     <origin xyz="0 0 0.004" rpy="0 ${-pi/2} ${pi}"/>
   </xacro:robotiq_85_gripper>
 
-  <gazebo reference="wrist_3_joint">
+  <!-- <gazebo reference="wrist_3_joint"> -->
+  <!-- <gazebo reference="robotiq_85_left_finger_tip_joint">
     <provideFeedback>true</provideFeedback>
   </gazebo>
   
-  <!-- <gazebo>
+   <gazebo>
     <plugin name="ft_sensor_plugin" filename="libgazebo_ros_ft_sensor.so">
       <updateRate>250.0</updateRate>
-      <topicName>ft_sensor/raw</topicName>
-      <gaussianNoise>0.0</gaussianNoise>
-      <jointName>wrist_3_joint</jointName>
+      <topicName>ft_sensor/raw</topicName> -->
+      <!-- <gaussianNoise>0.0</gaussianNoise> -->
+      <!-- <jointName>wrist_3_joint</jointName> -->
+      <!-- <jointName>robotiq_85_left_finger_tip_joint</jointName>
     </plugin>
-   </gazebo>-->
+   </gazebo> -->
 
   <!-- <gazebo>
     <gripper name="gazebo_gripper">

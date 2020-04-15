@@ -31,18 +31,16 @@ from trac_ik_python.trac_ik import IK
 # import roslib; roslib.load_manifest('robotiq_2f_gripper_control')
 from robotiq_2f_gripper_control.msg import _Robotiq2FGripper_robot_output  as outputMsg
 
-MOVE_GRIPPER = True
 CLOSE_GRIPPER_VEL = 0.05
 OPEN_GRIPPER_VEL = -0.1
 STOP_GRIPPER_VEL = 0.0
 MIN_GRASP_ANGLE = 0.1
 MAX_GRASP_ANGLE = 0.70
-STARTED_GRIPPER = False
-CONTACT = False
-MIN_OPEN_INIT = 0.40
-MAX_CLOSE_INIT = 0.45
-GRIPPER_INIT = True
-# GRASPING = True # False
+MONITOR_WRENCH = False
+CONTACT = False # Tells the node that a contact is occurring and Stops the gripper if ths specified force above is applied to the gripper
+MIN_GRIPPER_OPEN_INIT = 0.20 # Minimum angle that the gripper should be started using velocity command
+MAX_GRIPPER_CLOSE_INIT = 0.25 # Maximum angle that the gripper should be started using velocity command
+GRIPPER_INIT = True # Tells the node that the gripper was started
 
 def parse_args():
     parser = argparse.ArgumentParser(description='AAPF_Orientation')
@@ -86,12 +84,18 @@ class vel_control(object):
             self.pub_model = rospy.Publisher('/gazebo/set_link_state', LinkState, queue_size=1)
             self.model = rospy.wait_for_message('gazebo/model_states', ModelStates)
             self.model_coordinates = rospy.ServiceProxy( '/gazebo/get_link_state', GetLinkState)
-            rospy.Subscriber('/ft_sensor/raw', WrenchStamped, self.monitor_wrench, queue_size=1)
 
             # LEFT GRIPPER
             rospy.Subscriber('/left_finger_bumper_vals', ContactsState, self.monitor_contacts_left_finger) # ContactState
-            self.left_status = False
+            self.left_collision = False
+            self.left_wrench = []
             self.contactState_left = ContactState()
+
+            # RIGHT GRIPPER
+            rospy.Subscriber('/right_finger_bumper_vals', ContactsState, self.monitor_contacts_right_finger) # ContactState
+            self.right_collision = False
+            self.right_wrench = []
+            self.contactState_right = ContactState()
             
         # GGCNN
         self.joint_values_ggcnn = []
@@ -123,15 +127,32 @@ class vel_control(object):
         self.controller_switch('pos_based_pos_traj_controller', 'joint_group_vel_controller', 1)
 
     def monitor_contacts_left_finger(self, msg):
+        global MONITOR_WRENCH
         if msg.states:
             string = msg.states[0].collision1_name
             string = re.findall(r'::(.+?)::',string)[0]
-            self.left_status = True
-            print(string)
+            self.left_collision = True
+            self.left_wrench = msg.states[0].wrenches
+            # print("Left finger collision:" , string)
+            # print("Left finger status: ", self.left_collision)
+            # print("Wrenches left: ", )
+            # print("\n")
         else:
-            self.left_status = False
+            self.left_collision = False        
 
-        print(self.left_status)
+    def monitor_contacts_right_finger(self, msg):
+        global MONITOR_WRENCH
+        if msg.states:
+            string = msg.states[0].collision1_name
+            string = re.findall(r'::(.+?)::',string)[0]
+            self.right_collision = True
+            self.right_wrench = msg.states[0].wrenches
+            # print("Right finger collision:" , string)
+            # print("Right finger status: ", self.right_collision)
+            # print("Wrenches: ", msg.states[0].wrenches[0].force)
+            # print("\n")
+        else:
+            self.right_collision = False
 
     def get_ik(self, pose, ori = 'pick'):
         """Get the inverse kinematics 
@@ -170,7 +191,6 @@ class vel_control(object):
                 sol[-1] = 0.0
     
         return sol
-
 
     """
     Quintic polynomial trajectory
@@ -299,67 +319,68 @@ class vel_control(object):
 
         return True
 
-    """
-    This method monitor the force applied to the gripper
-    """       
-    def monitor_wrench(self, msg):
-        global MOVE_GRIPPER, STARTED_GRIPPER, CONTACT, GRASPING
-
-        # print(msg)
-        if STARTED_GRIPPER:
-            if float(msg.wrench.force.x) < -2.0 or float(msg.wrench.force.x) > 2.0 or \
-               float(msg.wrench.force.y) < -5.0 or float(msg.wrench.force.y) > 15.0 or \
-               float(msg.wrench.force.z) < -4.0 or float(msg.wrench.force.z) > 5.0:
-                MOVE_GRIPPER = False
-                CONTACT = True
-            
     def gripper_init(self):
         global CLOSE_GRIPPER_VEL, OPEN_GRIPPER_VEL
-        global MIN_OPEN_INIT, MAX_CLOSE_INIT
+        global MIN_GRIPPER_OPEN_INIT, MAX_GRIPPER_CLOSE_INIT
 
-        gripper_vel = OPEN_GRIPPER_VEL
-
-        if self.robotic < MIN_OPEN_INIT: # MIN_OPEN_INIT = 0.15
-            gripper_vel = CLOSE_GRIPPER_VEL
-             
-        self.joint_vels_gripper.data = np.array([gripper_vel])
-        self.pub_vel_gripper.publish(self.joint_vels_gripper)
-
-        rate = rospy.Rate(125)
-        while not rospy.is_shutdown():
-            if gripper_vel == OPEN_GRIPPER_VEL:
-                if self.robotic < MIN_OPEN_INIT:
+        rate = rospy.Rate(20)
+        joint_vels_gripper = Float64MultiArray()
+        if self.robotic < MIN_GRIPPER_OPEN_INIT:
+            joint_vels_gripper.data = np.array([CLOSE_GRIPPER_VEL])
+            self.pub_vel_gripper.publish(joint_vels_gripper)
+            while not rospy.is_shutdown():
+                if self.robotic > MAX_GRIPPER_CLOSE_INIT:
                     break
-            else:
-                if self.robotic > MAX_CLOSE_INIT:
+                rate.sleep()
+
+        elif self.robotic > MAX_GRIPPER_CLOSE_INIT:
+            joint_vels_gripper.data = np.array([OPEN_GRIPPER_VEL])
+            self.pub_vel_gripper.publish(joint_vels_gripper)
+            while not rospy.is_shutdown():
+                if self.robotic < MIN_GRIPPER_OPEN_INIT:
                     break
-            rate.sleep()
-
-        print("self.robotic: ", self.robotic)
-
-        self.joint_vels_gripper.data = np.array([0.0])
-        self.pub_vel_gripper.publish(self.joint_vels_gripper)
+                rate.sleep()
+        
+        joint_vels_gripper.data = np.array([0.0])
+        self.pub_vel_gripper.publish(joint_vels_gripper)
 
     """
     Control the gripper by using velocity controller
     """
     def gripper_vel_control(self, action):
-        global MOVE_GRIPPER
+        global GRIPPER_INIT, MONITOR_WRENCH
+        global CLOSE_GRIPPER_VEL, OPEN_GRIPPER_VEL
 
-        rate = rospy.Rate(125)
+        MONITOR_WRENCH = True
+        
+        rate = rospy.Rate(120)
 
         if action == 'open':
-            print(np.array(OPEN_GRIPPER_VEL))
             self.joint_vels_gripper.data = np.array([OPEN_GRIPPER_VEL])
             self.pub_vel_gripper.publish(self.joint_vels_gripper)
-            while not rospy.is_shutdown() and MOVE_GRIPPER and self.robotic > 0.1:
+            while not rospy.is_shutdown() and GRIPPER_INIT and self.robotic > 0.1:
                 rate.sleep()
         elif action == 'close':
-            self.joint_vels_gripper.data = np.array([CLOSE_GRIPPER_VEL])
-            self.pub_vel_gripper.publish(self.joint_vels_gripper)
-            while not rospy.is_shutdown() and MOVE_GRIPPER and self.robotic < 0.6:
+            # Translating this while into English: 
+            # While rospy is not shutdown and gripper is still running and the angle of the gripper is not greater than 0.7
+            # and colliisions of borth gripper occur (the collision must occur to both grippers tip in order to stop them.
+            # That's why we use OR
+            while not rospy.is_shutdown() and GRIPPER_INIT and not self.robotic > 0.7 and (not self.left_collision or not self.right_collision):
+                self.joint_vels_gripper.data = np.array([CLOSE_GRIPPER_VEL])
+                self.pub_vel_gripper.publish(self.joint_vels_gripper)
+                print("Left wrench: ", self.left_wrench)
+                print('\n')
+                print("Left collision: ", self.left_collision)
+                
+                print("Right wrench: ", self.right_wrench)
+                print('\n')
+                print("right collision: ", self.right_collision)
                 rate.sleep()
-           
+            print("Left collision: ", self.left_collision)
+            print("right collision: ", self.right_collision)
+
+        MONITOR_WRENCH = False
+
         # stops the robot after the goal is reached
         rospy.loginfo("Gripper stopped!")
         self.joint_vels_gripper.data = np.array([0.0])
@@ -442,14 +463,14 @@ class vel_control(object):
         print "\n==== Goal reached!"
 
 def main():
-    global MOVE_GRIPPER, STARTED_GRIPPER, GRIPPER_INIT, GRASPING
+    global MONITOR_WRENCH, GRIPPER_INIT
 
     arg = parse_args()
 
     # Turn position controller ON
     ur5_vel = vel_control(arg)
     ur5_vel.turn_position_controller_on()
-    point_init = [-0.3897482470295059, 0.0013201868456541224, 0.02555623365136256] #[-0.40, 0.0, 0.15]
+    point_init = [-0.3897482470295059, 0.0013201868456541224, 0.04] #[-0.40, 0.0, 0.15]
     joint_values_home = ur5_vel.get_ik(point_init, 'place')
     ur5_vel.joint_values_home = joint_values_home
 
@@ -470,19 +491,19 @@ def main():
         ur5_vel.command_gripper('a')
         ur5_vel.command_gripper('o')
     
-    GRIPPER_INIT = False
+    GRIPPER_INIT = True
 
     while not rospy.is_shutdown():
 
-        point_test = [-0.3897482470295059, 0.0013201868456541224, 0.02555623365136256]
-        raw_input("==== Press enter to move the robot to the pre-grasp position!")
+        # point_test = [-0.3897482470295059, 0.0013201868456541224, 0.02555623365136256]
+        # raw_input("==== Press enter to move the robot to the pre-grasp position!")
         # Ponto cartesiano que funciona na SSD512 [-0.65, 0.0, 0.20]
-        ur5_vel.traj_planner(point_test, 'place', False)
+        # ur5_vel.traj_planner(point_test, 'place', False)
 
-        point_test = [-0.52, 0.2, 0.02555623365136256]
-        raw_input("==== Press enter to move the robot to the pre-grasp position!")
+        # point_test = [-0.52, 0.2, 0.02555623365136256]
+        # raw_input("==== Press enter to move the robot to the pre-grasp position!")
         # Ponto cartesiano que funciona na SSD512 [-0.65, 0.0, 0.20]
-        ur5_vel.traj_planner(point_test, 'place', False)
+        # ur5_vel.traj_planner(point_test, 'place', False)
                 
         # It will be replaced by the GGCNN position
         # It is just to simulate the final position
@@ -492,16 +513,19 @@ def main():
         # !!! GGCNN is not yet implemented to pick a object in the printer (makerbot)
         #It closes the gripper before approaching the object
         #It prevents the gripper to collide with other objects when grasping
-        if not arg.gazebo:
-            raw_input("==== Press enter to close the gripper to a pre-grasp position!")
-            ur5_vel.command_gripper('p')
+        # if not arg.gazebo:
+        #     raw_input("==== Press enter to close the gripper to a pre-grasp position!")
+        #     ur5_vel.command_gripper('p')
 
-        raw_input("==== Press enter to move the robot to the goal position given by GGCNN!")
-        ur5_vel.traj_planner([], 'place', True)
+        # raw_input("==== Press enter to move the robot to the goal position given by GGCNN!")
+        # ur5_vel.traj_planner([], 'place', True)
 
         # As the object iteraction in Gazebo is not working properly, the gripper only closes
         # when using the real robot
-        if not arg.gazebo:
+        raw_input("==== Press enter to close the gripper!")
+        if arg.gazebo:
+            ur5_vel.gripper_vel_control('close')
+        else:
             raw_input("==== Press enter to close the gripper!")
             print(ur5_vel.d[-2])
             ur5_vel.command_gripper('c')
@@ -511,12 +535,11 @@ def main():
         # raw_input("==== Press enter to put the object down!")
         # ur5_vel.traj_planner([-0.6, 0.0, 0.25], 'place')   
 
-        # raw_input("==== Press enter to open the gripper!")
-        # if arg.gazebo:
-        #     MOVE_GRIPPER = True    
-        #     ur5_vel.gripper_vel_control('open')
-        # else:
-        #     ur5_vel.command_gripper('o')
+        raw_input("==== Press enter to open the gripper!")
+        if arg.gazebo:
+            ur5_vel.gripper_vel_control('open')
+        else:
+            ur5_vel.command_gripper('o')
 
 if __name__ == '__main__':
     try:
