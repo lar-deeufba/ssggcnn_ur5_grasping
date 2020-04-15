@@ -79,22 +79,10 @@ def main():
     moving1 = Moving("table", Spawning1, ptFinal[0], ptFinal[1], ptFinal[2], oriFinal, path_table)
     moving1.spawning()
 
-    rospy.sleep(1.0)
-
-    # ptFinal = [0.0, -0.95, 0.165]    
-    # oriFinal = quaternion_from_euler(1.57, 0.0, 1.57)
-    # moving2 = Moving("custom_box", Spawning1, x_position + ptFinal[0], y_position + ptFinal[1], z_position + ptFinal[2], oriFinal, path_box)
-    # moving2.spawning()
-
-    ptFinal = [0.0, -0.95, 0.0]   
-    oriFinal = quaternion_from_euler(0.0, 0.0, 3.14)
-    moving3 = Moving("marker_bot", Spawning1, x_position + ptFinal[0], y_position + ptFinal[1], z_position + ptFinal[2], oriFinal, marker_bot)
-    moving3.spawning()
-
     rospy.sleep(0.5)
 
-    ptFinal = [0.0, -0.95, 0.16] # on the markerbot
-    # ptFinal = [0.0, -0.4, 0.0] # on the table
+    # ptFinal = [0.0, -0.95, 0.16] # on the markerbot
+    ptFinal = [0.0, -0.4, 0.0] # on the table
     oriFinal = quaternion_from_euler(0.0, 0.0, 0.0)
     moving4 = Moving("bico_dosador", Spawning1, x_position + ptFinal[0], y_position + ptFinal[1], z_position + ptFinal[2], oriFinal, bico_dosador)
     moving4.spawning()

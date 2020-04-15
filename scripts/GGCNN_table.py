@@ -8,15 +8,17 @@ import copy
 from copy import deepcopy
 import rosservice
 import sys
+import re
 
 from std_msgs.msg import Float64MultiArray, Float32MultiArray
 from control_msgs.msg import FollowJointTrajectoryAction, FollowJointTrajectoryGoal
 from sensor_msgs.msg import JointState
 from trajectory_msgs.msg import JointTrajectory, JointTrajectoryPoint
 from geometry_msgs.msg import WrenchStamped
+from controller_manager_msgs.srv import SwitchController
 
 # Gazebo
-from gazebo_msgs.msg import ModelState, ModelStates, ContactState, LinkState
+from gazebo_msgs.msg import ModelState, ModelStates, ContactsState, ContactState, LinkState
 from gazebo_msgs.srv import GetModelState, GetLinkState
 
 from tf import TransformListener, TransformerROS, TransformBroadcaster
@@ -37,8 +39,8 @@ MIN_GRASP_ANGLE = 0.1
 MAX_GRASP_ANGLE = 0.70
 STARTED_GRIPPER = False
 CONTACT = False
-MAX_OPEN_INIT = 0.15
-MAX_CLOSE_INIT = 0.10
+MIN_OPEN_INIT = 0.40
+MAX_CLOSE_INIT = 0.45
 GRIPPER_INIT = True
 # GRASPING = True # False
 
@@ -48,15 +50,10 @@ def parse_args():
     args = parser.parse_args()
     return args
 
-def turn_velocity_controller_on():
-    rosservice.call_service('/controller_manager/switch_controller', [['joint_group_vel_controller'], ['pos_based_pos_traj_controller'], 1])
-
-def turn_position_controller_on():
-    rosservice.call_service('/controller_manager/switch_controller', [['pos_based_pos_traj_controller'], ['joint_group_vel_controller'], 1])
-    # rosservice.call_service('/controller_manager/switch_controller', [['pos_based_pos_traj_controller'], ['joint_group_vel_controller','gripper_controller'], 1])
-
 class vel_control(object):
     def __init__(self, args, joint_values = None):
+        rospy.init_node('command_GGCNN_ur5')
+
         self.args = args
         self.joint_values_home = joint_values
 
@@ -68,6 +65,9 @@ class vel_control(object):
 
         # Used to perform TF transformations
         self.tf = TransformListener()
+
+        # Used to change the controller
+        self.controller_switch = rospy.ServiceProxy('/controller_manager/switch_controller', SwitchController)
 
         # actionClient used to send joint positions
         self.client = actionlib.SimpleActionClient('pos_based_pos_traj_controller/follow_joint_trajectory', FollowJointTrajectoryAction)
@@ -86,14 +86,18 @@ class vel_control(object):
             self.pub_model = rospy.Publisher('/gazebo/set_link_state', LinkState, queue_size=1)
             self.model = rospy.wait_for_message('gazebo/model_states', ModelStates)
             self.model_coordinates = rospy.ServiceProxy( '/gazebo/get_link_state', GetLinkState)
-            self.wrench = rospy.Subscriber('/ft_sensor/raw', WrenchStamped, self.monitor_wrench, queue_size=1)
-            # self.model_contacts = rospy.Subscriber('/gazebo/default/physics/contacts', ContactState, self.monitor_contacts, queue_size=10)
+            rospy.Subscriber('/ft_sensor/raw', WrenchStamped, self.monitor_wrench, queue_size=1)
 
+            # LEFT GRIPPER
+            rospy.Subscriber('/left_finger_bumper_vals', ContactsState, self.monitor_contacts_left_finger) # ContactState
+            self.left_status = False
+            self.contactState_left = ContactState()
+            
         # GGCNN
         self.joint_values_ggcnn = []
         self.posCB = []
         self.ori = []
-        self.cmd_pub = rospy.Subscriber('ggcnn/out/command', Float32MultiArray, self.ggcnn_command, queue_size=10)
+        rospy.Subscriber('ggcnn/out/command', Float32MultiArray, self.ggcnn_command, queue_size=10)
 
         # Standard attributes used to send joint position commands
         self.joint_vels = Float64MultiArray()
@@ -111,6 +115,23 @@ class vel_control(object):
         # Denavit-Hartenberg parameters of UR5
         # The order of the parameters is d1, SO, EO, a2, a3, d4, d45, d5, d6
         self.ur5_param = (0.089159, 0.13585, -0.1197, 0.425, 0.39225, 0.10915, 0.093, 0.09465, 0.0823 + 0.15)
+
+    def turn_velocity_controller_on(self):
+        self.controller_switch('joint_group_vel_controller', 'pos_based_pos_traj_controller', 1)
+        
+    def turn_position_controller_on(self):
+        self.controller_switch('pos_based_pos_traj_controller', 'joint_group_vel_controller', 1)
+
+    def monitor_contacts_left_finger(self, msg):
+        if msg.states:
+            string = msg.states[0].collision1_name
+            string = re.findall(r'::(.+?)::',string)[0]
+            self.left_status = True
+            print(string)
+        else:
+            self.left_status = False
+
+        print(self.left_status)
 
     def get_ik(self, pose, ori = 'pick'):
         """Get the inverse kinematics 
@@ -133,7 +154,7 @@ class vel_control(object):
             # ('shoulder_link', 'upper_arm_link', 'forearm_link', 'wrist_1_link', 'wrist_2_link', 'wrist_3_link', 'tool0')
             
             ik_solver = IK("base_link", "tool0", solve_type="Distance")
-            sol = ik_solver.get_ik([0.30138727537716037, -1.6153495734651055, -2.086529024901576, 0.5611198563245517, 1.2694091499722355, 0.0], 
+            sol = ik_solver.get_ik([0.2201039360819781, -1.573845095552878, -1.521853400505349, -1.6151347051274518, 1.5704492904506875, 0.0], 
                     pose[0], pose[1], pose[2] + grasping_link_offset, q[0], q[1], q[2], q[3])
             if sol is not None:
                 sol = list(sol)
@@ -220,17 +241,8 @@ class vel_control(object):
         self.posCB, _ = self.tf.lookupTransform("base_link", "object_link", rospy.Time())
         _, oriObjCam = self.tf.lookupTransform("camera_depth_optical_frame", "object_detected", rospy.Time())
         self.ori = euler_from_quaternion(oriObjCam)
+        print(self.posCB)
 
-        # sol = self.get_ik(self.posCB, 'place')
-        # while sol is None:
-            # print("Sol is None")
-            # sol = self.get_ik(self.posCB, 'place')
-
-        # self.joint_values_ggcnn = sol
-        
-        # Adjust the orientation with GGCNN
-        # self.joint_values_ggcnn[-1] = [0.0]
-        # self.joint_values_ggcnn[-1] = self.ori[-1]
         
     def genCommand(self, char, command, pos = None):
         """Update the command according to the character entered by the user."""    
@@ -302,27 +314,28 @@ class vel_control(object):
                 CONTACT = True
             
     def gripper_init(self):
-        global MOVE_GRIPPER
         global CLOSE_GRIPPER_VEL, OPEN_GRIPPER_VEL
-        global MAX_OPEN_INIT, MAX_CLOSE_INIT
+        global MIN_OPEN_INIT, MAX_CLOSE_INIT
 
-        if self.robotic > MAX_OPEN_INIT:
-            gripper_vel = OPEN_GRIPPER_VEL
-        else:
+        gripper_vel = OPEN_GRIPPER_VEL
+
+        if self.robotic < MIN_OPEN_INIT: # MIN_OPEN_INIT = 0.15
             gripper_vel = CLOSE_GRIPPER_VEL
-
+             
         self.joint_vels_gripper.data = np.array([gripper_vel])
         self.pub_vel_gripper.publish(self.joint_vels_gripper)
 
         rate = rospy.Rate(125)
         while not rospy.is_shutdown():
-            rate.sleep()
             if gripper_vel == OPEN_GRIPPER_VEL:
-                if self.robotic < MAX_CLOSE_INIT:
+                if self.robotic < MIN_OPEN_INIT:
                     break
             else:
-                if self.robotic > MAX_OPEN_INIT:
+                if self.robotic > MAX_CLOSE_INIT:
                     break
+            rate.sleep()
+
+        print("self.robotic: ", self.robotic)
 
         self.joint_vels_gripper.data = np.array([0.0])
         self.pub_vel_gripper.publish(self.joint_vels_gripper)
@@ -378,7 +391,7 @@ class vel_control(object):
     """
     def home_pos(self):
         global GRIPPER_INIT
-        turn_position_controller_on()
+        self.turn_position_controller_on()
         rospy.sleep(0.1)
 
         if GRIPPER_INIT and self.args.gazebo:
@@ -402,8 +415,8 @@ class vel_control(object):
     position but it is not always true for gazebo
     """
     def set_pos_robot(self, joint_values_param, time = 18.0):
-        turn_position_controller_on()
         rospy.sleep(0.1)
+        self.turn_position_controller_on()
 
         joint_values = deepcopy(joint_values_param)
 
@@ -434,18 +447,18 @@ def main():
     arg = parse_args()
 
     # Turn position controller ON
-    turn_position_controller_on()
     ur5_vel = vel_control(arg)
-    joint_values_home = ur5_vel.get_ik([-0.60, 0.0, 0.23], 'pick')
+    ur5_vel.turn_position_controller_on()
+    point_init = [-0.3897482470295059, 0.0013201868456541224, 0.02555623365136256] #[-0.40, 0.0, 0.15]
+    joint_values_home = ur5_vel.get_ik(point_init, 'place')
     ur5_vel.joint_values_home = joint_values_home
-    # joint_values_home = ur5_vel.get_ik([-0.50, 0.0, 0.30], 'place') # FOR TEST ON TABLE
-    # ur5_vel.joint_values_home = joint_values_home # FOR TEST ON TABLE
 
     # Send the robot to the custom HOME position
-    raw_input("==== Press enter to 'home' the robot and open gripper!")
+    raw_input("==== Press enter to 'home' the robot!")
     rospy.on_shutdown(ur5_vel.home_pos)
     ur5_vel.set_pos_robot(ur5_vel.joint_values_home)
-    # ur5_vel.traj_planner([-0.65, 0.0, 0.20], 'pick', False) # FOR TEST ON TABLE 
+    
+    raw_input("==== Press enter to init to gripper!")
     if arg.gazebo:
         rospy.loginfo("Starting the gripper in Gazebo! Please wait...")
         ur5_vel.gripper_init()
@@ -461,9 +474,15 @@ def main():
 
     while not rospy.is_shutdown():
 
+        point_test = [-0.3897482470295059, 0.0013201868456541224, 0.02555623365136256]
         raw_input("==== Press enter to move the robot to the pre-grasp position!")
         # Ponto cartesiano que funciona na SSD512 [-0.65, 0.0, 0.20]
-        ur5_vel.traj_planner([-0.68, 0.0, 0.20], 'pick', False)
+        ur5_vel.traj_planner(point_test, 'place', False)
+
+        point_test = [-0.52, 0.2, 0.02555623365136256]
+        raw_input("==== Press enter to move the robot to the pre-grasp position!")
+        # Ponto cartesiano que funciona na SSD512 [-0.65, 0.0, 0.20]
+        ur5_vel.traj_planner(point_test, 'place', False)
                 
         # It will be replaced by the GGCNN position
         # It is just to simulate the final position
@@ -478,7 +497,7 @@ def main():
             ur5_vel.command_gripper('p')
 
         raw_input("==== Press enter to move the robot to the goal position given by GGCNN!")
-        ur5_vel.traj_planner([], 'pick', True)
+        ur5_vel.traj_planner([], 'place', True)
 
         # As the object iteraction in Gazebo is not working properly, the gripper only closes
         # when using the real robot

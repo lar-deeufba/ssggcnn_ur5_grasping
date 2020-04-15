@@ -118,31 +118,32 @@ class Server:
         global crop_size, args
 
         # The EOF position should be tracked in real time by depth_callback
-        # link_pose, _ = transf.lookupTransform("base_link", "grasping_link", rospy.Time(0))
-        # ROBOT_Z = link_pose[2]
-        ROBOT_Z = 0.35
+        link_pose, _ = transf.lookupTransform("base_link", "grasping_link", rospy.Time(0))
+        ROBOT_Z = link_pose[2]
+        # ROBOT_Z = 0.35
 
         # Each with is used to calculate the processing time
         with TimeIt('Crop'):
-
             # Depth is the depth image converted into open cv format
             # Real realsense resolution 480x640
             self.depth_message_ssd512.encoding = "mono16"
             depth = bridge.imgmsg_to_cv2(self.depth_message_ssd512, 'mono8')
+            
             # depth = depth.astype('uint16') 
             depth = np.float32(depth)
 
             height_res, width_res = depth.shape
             # height_res, width_res = depth.shape
-            print("Height_res: ", height_res)
-            print("Width_res: ", width_res)
-            print("Dtype: ", depth.dtype)
+            # print("Height_res: ", height_res)
+            # print("Width_res: ", width_res)
+            # print("Dtype: ", depth.dtype)
 
             'TEST DEPTH'
             depth_test_circle = depth.copy()
 
-            # depth image cropped in the middle of the image (Just for testing) - [90:390, 170:470] 
-            depth_crop = depth[(height_res-crop_size) // 2 : (height_res-crop_size) // 2 + crop_size, (width_res - crop_size)//2 : (width_res - crop_size)//2 + crop_size]
+            # depth image cropped in the middle of the image (Just for testing) - [170:470, 90:390] 
+            depth_crop = depth[(height_res- crop_size) // 2 : (height_res-crop_size) // 2 + crop_size,
+                               (width_res - crop_size) // 2 : (width_res -crop_size) // 2 + crop_size]
             
             # Creates a deep copy of the depth_crop image
             depth_crop = depth_crop.copy()
@@ -191,9 +192,9 @@ class Server:
             # depth_center.sort()
             # depth_center = depth_center[:10].mean() * 1000.0
 
-        with TimeIt('Resizing'):
+        # with TimeIt('Resizing'):
                 # Resize
-            depth_crop = cv2.resize(depth_crop, (crop_size, crop_size), cv2.INTER_AREA)
+            # depth_crop = cv2.resize(depth_crop, (crop_size, crop_size), cv2.INTER_AREA)
 
         with TimeIt('Inference'):
             # Convert depth_crop values to meters
@@ -262,11 +263,10 @@ class Server:
             # Convert max_pixel back to uncropped/resized image coordinates in order to do the camera transform.
             # max_pixel = ((np.array(max_pixel) / 300.0 * crop_size) + np.array([(height_res - crop_size) // 2, (width_res - crop_size) // 2]))
             # max_pixel = np.round(max_pixel).astype(np.int)
-            reescaled_height = int(prev_mp[0])
+            reescaled_height = int((height_res- crop_size) // 2+ prev_mp[0])
             reescaled_width = int((width_res - crop_size) // 2 + prev_mp[1])
-            max_pixel = [reescaled_height, reescaled_width]
+            max_pixel_reescaled = [reescaled_height, reescaled_width]
 
-            'Depth crop with square'
             vetx = [-(width/2), (width/2), (width/2), -(width/2), -(width/2)]
             vety = [10, 10, -10, -10, 10]    
             X = [ int((vetx[i] * np.cos(ang) - vety[i] * np.sin(ang)) + max_pixel_detected[0]) for i in range(len(vetx))]
@@ -279,29 +279,29 @@ class Server:
             cv2.line(depth_crop_copy, (Y[2],X[2]), (Y[3],X[3]), (0, 0, 0), 2)
             cv2.line(depth_crop_copy, (Y[3],X[3]), (Y[4],X[4]), (0.2, 0.2, 0.2), 2)
             depth_with_square.publish(bridge.cv2_to_imgmsg(depth_crop_copy))
-            'Depth crop with square'
-
-            'Max pixel test topic'
-            # Get the max_pixel height
-            # Offset is used to sync the object position and cam feedback
-            # offset_mm = 100 if args.real else 45
-            # rr, cc = circle(max_pixel[0], max_pixel[1], 15)
-            point_depth = depth_test_circle[max_pixel[0], max_pixel[1]]
-            # print("Point depth: ", point_depth)
-            # depth_test_circle[rr, cc] = 0
-            # depth_test_circle = bridge.cv2_to_imgmsg(depth_test_circle)
-            # depth_test.publish(depth_test_circle)
-            'Max pixel test topic'
-
+            
             'TEST NEW METHOD'
             depth_new_method_image = bridge.imgmsg_to_cv2(self.depth_raw)
             depth_new_method = depth_new_method_image.copy()
             # depth_crop_new_method = depth_new_method[(height_res-crop_size) // 2 : (height_res-crop_size) // 2 + crop_size, (width_res - crop_size)//2 : (width_res - crop_size)//2 + crop_size]
-            rr, cc = circle(max_pixel[0], max_pixel[1], 15)
+            rr, cc = circle(max_pixel_reescaled[0], max_pixel_reescaled[1], 15)
+            point_depth = depth_new_method[max_pixel_reescaled[0], max_pixel_reescaled[1]]
             depth_new_method[rr, cc] = 0
-            depth_new_method_img = bridge.cv2_to_imgmsg(depth_new_method)
-            depth_test.publish(depth_new_method_img)
+            depth_new_method = bridge.cv2_to_imgmsg(depth_new_method)
+            depth_test.publish(depth_new_method)
             'TEST NEW METHOD'
+
+            'Max pixel test topic'
+            # Get the max_pixel_reescaled height
+            # Offset is used to sync the object position and cam feedback
+            # offset_mm = 100 if args.real else 45
+            # rr, cc = circle(max_pixel_reescaled[0], max_pixel_reescaled[1], 15)
+            # point_depth = depth_test_circle[max_pixel_reescaled[0], max_pixel_reescaled[1]]
+            print("Point depth: ", point_depth)
+            # depth_test_circle[rr, cc] = 0
+            # depth_test_circle = bridge.cv2_to_imgmsg(depth_test_circle)
+            # depth_test.publish(depth_test_circle)
+            'Max pixel test topic'
 
             ang = ang + np.pi/2
             crop_size_width = float(crop_size)
@@ -311,13 +311,13 @@ class Server:
             # Get the grip width in meters
             width_m = width_out / crop_size_width * 2.0 * point_depth * np.tan(FOV * crop_size_width / height_res / 2.0 / 180.0 * np.pi) / 1000 #* 0.37
             width_m = abs(width_m[max_pixel_detected[0], max_pixel_detected[1]])
-            print("Width_m: ", width_m)
+            # print("Width_m: ", width_m)
             
             # These magic numbers are my camera intrinsic parameters.
-            x = (max_pixel[1] - cx)/(fx) * point_depth
-            y = (max_pixel[0] - cy)/(fy) * point_depth
+            x = (max_pixel_reescaled[1] - cx)/(fx) * point_depth
+            y = (max_pixel_reescaled[0] - cy)/(fy) * point_depth
             z = point_depth
-            print("Point_depth: ", z)
+            # print("Point_depth: ", z)
 
             if np.isnan(z):
                 return
@@ -386,6 +386,7 @@ class Server:
                               "object_detected",
                               "camera_depth_optical_frame_rotated")
 
+            transf.waitForTransform("base_link", "object_detected", rospy.Time(), rospy.Duration(1.0))
             object_pose, object_ori = transf.lookupTransform("base_link", "object_detected", rospy.Time(0))
             object_ori = euler_from_quaternion(object_ori)
 

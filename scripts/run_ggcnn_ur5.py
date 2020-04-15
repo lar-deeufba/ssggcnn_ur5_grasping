@@ -116,8 +116,8 @@ def depth_callback(depth_message):
         depth_test_circle = depth.copy()
         
         height_res, width_res = depth.shape
-        print("Height_res: ", height_res)
-        print("Width_res: ", width_res)
+        # print("Height_res: ", height_res)
+        # print("Width_res: ", width_res)
         
         # It crops a 300x300 resolution square at the top of the depth image
         # depth[0:300, 170:470]
@@ -252,7 +252,7 @@ def depth_callback(depth_message):
 
         'Depth crop with square'
         vetx = [-(width/2), (width/2), (width/2), -(width/2), -(width/2)]
-        vety = [10, 10, -10, -10, 10]    
+        vety = [10, 10, -10, -10, 10]
         X = [ int((vetx[i] * np.cos(ang) - vety[i] * np.sin(ang)) + max_pixel_detected[0]) for i in range(len(vetx))]
         Y = [ int((vety[i] * np.cos(ang) + vetx[i] * np.sin(ang)) + max_pixel_detected[1]) for i in range(len(vetx))]
         rr1, cc1 = circle(max_pixel_detected[0], max_pixel_detected[1], 5)
@@ -284,7 +284,7 @@ def depth_callback(depth_message):
         # Get the grip width in meters
         width_m = width_out / crop_size_width * 2.0 * point_depth * np.tan(FOV * crop_size_width / height_res / 2.0 / 180.0 * np.pi) / 1000 #* 0.37
         width_m = abs(width_m[max_pixel_detected[0], max_pixel_detected[1]])
-        print("Width_m: ", width_m)
+        # print("Width_m: ", width_m)
         
         # These magic numbers are my camera intrinsic parameters.
         x = (max_pixel[1] - cx)/(fx) * point_depth
@@ -370,7 +370,7 @@ def depth_callback(depth_message):
                           "object_link",
                           "base_link")
 
-depth_sub = rospy.Subscriber("/camera/depth/image_raw", Image, depth_callback, queue_size=1)
+depth_sub = rospy.Subscriber(camera_topic, Image, depth_callback, queue_size=10)
 
 while not rospy.is_shutdown():
     rospy.spin()
