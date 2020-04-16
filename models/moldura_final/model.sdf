@@ -1,13 +1,13 @@
 <?xml version="1.0" ?>
 <sdf version="1.5">
-  <model name="Bico_dosador">
+  <model name="Moldura_final">
     <static>false</static>
-    <link name="bico_dosador_link">
+    <link name="Moldura_final_link">
 
       <collision name="collision">
         <geometry>
           <mesh>
-            <uri>model://bico_dosador/meshes/bico_dosador.dae</uri>
+            <uri>model://moldura_final/meshes/moldura_final.dae</uri>
             <scale>1.0 1.0 1.0</scale>
           </mesh>
         </geometry>
@@ -16,7 +16,7 @@
       <visual name="visual">
         <geometry>
           <mesh>
-            <uri>model://bico_dosador/meshes/bico_dosador.dae</uri>
+            <uri>model://moldura_final/meshes/moldura_final.dae</uri>
             <scale>1.0 1.0 1.0</scale>
           </mesh>
         </geometry>
