@@ -1,0 +1,32 @@
+<?xml version="1.0" ?>
+<sdf version="1.5">
+  <model name="Bico dosador">
+    <static>false</static>
+    <link name="bico_dosador_link">
+
+      <collision name="collision">
+        <geometry>
+          <mesh>
+            <uri>model://bico_dosador/meshes/bico_dosador.dae</uri>
+            <scale>0.002 0.002 0.002</scale>
+          </mesh>
+        </geometry>
+      </collision>
+
+      <visual name="visual">
+        <geometry>
+          <mesh>
+            <uri>model://bico_dosador/meshes/bico_dosador.dae</uri>
+            <scale>0.002 0.002 0.002</scale>
+          </mesh>
+        </geometry>
+        <material>
+          <script>
+            <uri>file://media/materials/scripts/gazebo.material</uri>
+            <name>Gazebo/White</name>
+          </script>
+        </material>
+      </visual>
+    </link>
+  </model>
+</sdf>
