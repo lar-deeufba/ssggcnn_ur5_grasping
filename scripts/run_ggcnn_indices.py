@@ -19,7 +19,7 @@ import rospy
 from cv_bridge import CvBridge
 from geometry_msgs.msg import PoseStamped
 from sensor_msgs.msg import Image, CameraInfo, JointState
-from std_msgs.msg import Float32MultiArray
+from std_msgs.msg import Float32MultiArray, Int32MultiArray
 
 from tf.transformations import quaternion_from_euler, euler_from_quaternion
 
@@ -78,7 +78,8 @@ class ssgg_grasping(object):
         # Output publishers.
         self.grasp_pub = rospy.Publisher('ggcnn/img/grasp', Image, queue_size=1)
         self.depth_pub = rospy.Publisher('ggcnn/img/depth', Image, queue_size=1)
-        self.img_with_square = rospy.Publisher('ggcnn/img/grasp_with_square', Image, queue_size=1)
+        self.depth_with_square = rospy.Publisher('ggcnn/img/grasp_depth_with_square', Image, queue_size=1)
+        self.img_with_square = rospy.Publisher('ggcnn/img/grasp_img_with_square', Image, queue_size=1)
         self.ang_pub = rospy.Publisher('ggcnn/img/ang', Image, queue_size=1)
         self.cmd_pub = rospy.Publisher('ggcnn/out/command', Float32MultiArray, queue_size=1)
 
@@ -121,13 +122,20 @@ class ssgg_grasping(object):
         self.cy = K[5]
 
         # Subscribers
+        rospy.Subscriber("/camera/color/image_raw", Image, self.image_callback, queue_size=10)
+        rospy.Subscriber('sdd_points_array', Int32MultiArray, self.bounding_boxes, queue_size=10)
         rospy.Subscriber(self.camera_topic, Image, self.depth_callback, queue_size=10)
-        # rospy.Subscriber("/camera/color/image_raw", Image, self.image_callback, queue_size=10)
         
-    # def image_callback(self, color_msg):
-    #     color_img = self.bridge.imgmsg_to_cv2(color_msg)
-    #     color_img = color_img[0 : self.crop_size, (self.width_res - self.crop_size)//2 : (self.width_res - self.crop_size)//2 + self.crop_size]
-    #     self.color_img = color_img
+    def bounding_boxes(self, msg):
+        box_number = len(msg.data) / 4
+
+    def image_callback(self, color_msg):
+        color_img = self.bridge.imgmsg_to_cv2(color_msg)
+        height_res, width_res, _ = color_img.shape
+        offset_height = 0 # 12
+        offset_width = 0 # 12
+        color_img = color_img[0 + offset_height: self.crop_size + offset_height, (width_res - self.crop_size)//2 + offset_width : (width_res - self.crop_size)//2 + self.crop_size + offset_width]
+        self.color_img = color_img
 
     def depth_callback(self, depth_message):
         self.depth_message = depth_message
@@ -231,8 +239,9 @@ class ssgg_grasping(object):
         Show the depth image with a rectangle representing the grasp
         Image resolution: 300x300
         """
-        depth_crop = self.depth_crop        
-        if depth_crop is not None:
+        depth_crop = self.depth_crop
+        color_img = self.color_img 
+        if depth_crop is not None and color_img is not None:
             ang = self.ang
             width_px = self.width_px
             max_pixel = self.max_pixel
@@ -246,13 +255,21 @@ class ssgg_grasping(object):
             Y = [ int((-1 * vetx[i]*np.sin(rectangle_ang) + vety[i]*np.cos(rectangle_ang)) + self.max_pixel[0]) for i in range(len(vetx))]
      
             rr1, cc1 = circle(max_pixel[0], max_pixel[1], 5)
-            img_crop_copy = depth_crop.copy()
+            depth_crop_copy = depth_crop.copy()
+            depth_crop_copy[rr1, cc1] = 0.2
+            cv2.line(depth_crop_copy, (X[0],Y[0]), (X[1],Y[1]), (0, 0, 0), 2)
+            cv2.line(depth_crop_copy, (X[1],Y[1]), (X[2],Y[2]), (0.2, 0.2, 0.2), 2)
+            cv2.line(depth_crop_copy, (X[2],Y[2]), (X[3],Y[3]), (0, 0, 0), 2)
+            cv2.line(depth_crop_copy, (X[3],Y[3]), (X[0],Y[0]), (0.2, 0.2, 0.2), 2)
+            self.depth_with_square.publish(self.bridge.cv2_to_imgmsg(depth_crop_copy))#, encoding="rgb8"))
+
+            img_crop_copy = color_img.copy()
             img_crop_copy[rr1, cc1] = 0.2
             cv2.line(img_crop_copy, (X[0],Y[0]), (X[1],Y[1]), (0, 0, 0), 2)
             cv2.line(img_crop_copy, (X[1],Y[1]), (X[2],Y[2]), (0.2, 0.2, 0.2), 2)
             cv2.line(img_crop_copy, (X[2],Y[2]), (X[3],Y[3]), (0, 0, 0), 2)
             cv2.line(img_crop_copy, (X[3],Y[3]), (X[0],Y[0]), (0.2, 0.2, 0.2), 2)
-            self.img_with_square.publish(self.bridge.cv2_to_imgmsg(img_crop_copy))#, encoding="rgb8"))
+            self.img_with_square.publish(self.bridge.cv2_to_imgmsg(img_crop_copy, encoding="rgb8"))
 
     def get_grasp_image(self):
         """

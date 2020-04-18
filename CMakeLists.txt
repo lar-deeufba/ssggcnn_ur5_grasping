@@ -19,6 +19,11 @@ find_package(OpenCV REQUIRED)
 
 catkin_package(CATKIN_DEPENDS message_runtime)
 
+add_service_files(
+  FILES
+  GetImage.srv
+)
+
 ###########
 ## Build ##
 ###########
