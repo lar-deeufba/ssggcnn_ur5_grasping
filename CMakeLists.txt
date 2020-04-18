@@ -15,7 +15,7 @@ find_package(catkin REQUIRED COMPONENTS
 
 find_package(OpenCV REQUIRED)
 
-find_package(gazebo REQUIRED)
+#find_package(gazebo REQUIRED)
 
 catkin_package(CATKIN_DEPENDS message_runtime)
 

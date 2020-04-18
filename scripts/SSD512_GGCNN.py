@@ -359,9 +359,9 @@ class Server:
                 angle_offset = 0.0
                 angle_deviation = 1
             else:
-                offset_x = 0.01
-                offset_y = 0.01
-                offset_z = 0.0
+                offset_x = 0.0
+                offset_y = 0.0
+                offset_z = 0.02
                 angle_offset = 0.0
                 angle_deviation = 1 #np.cos(angle_offset)
 

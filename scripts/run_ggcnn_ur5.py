@@ -132,6 +132,8 @@ def depth_callback(depth_message):
 
         # Substitute nan values by zero
         depth_crop[depth_nan] = 0
+
+
                         
     with TimeIt('Inpaint'):
         # open cv inpainting does weird things at the border.
@@ -168,6 +170,9 @@ def depth_callback(depth_message):
         # o formato era uint16 antes da transformacao
         # perde alguma informacao?
         depth_crop = depth_crop * depth_scale
+
+        test_image = bridge.cv2_to_imgmsg(depth_crop)
+        depth_test.publish(test_image)
         
     # with TimeIt('Calculate Depth'):
         # Figure out roughly the depth in mm of the part between the grippers for collision avoidance.
@@ -269,11 +274,11 @@ def depth_callback(depth_message):
         # Get the max_pixel height
         # Offset is used to sync the object position and cam feedback
         # offset_mm = 100 if args.real else 45
-        rr, cc = circle(max_pixel[0], max_pixel[1], 15)
+        # rr, cc = circle(max_pixel[0], max_pixel[1], 15)
         point_depth = depth_test_circle[max_pixel[0], max_pixel[1]]
-        depth_test_circle[rr, cc] = 0
-        depth_test_circle = bridge.cv2_to_imgmsg(depth_test_circle)
-        depth_test.publish(depth_test_circle)
+        # depth_test_circle[rr, cc] = 0
+        # depth_test_circle = bridge.cv2_to_imgmsg(depth_test_circle)
+        # depth_test.publish(depth_test_circle)
         'Max pixel test topic'
 
         ang = ang + np.pi/2
@@ -333,9 +338,9 @@ def depth_callback(depth_message):
             angle_offset = 0.0
             angle_deviation = 1
         else:
-            offset_x = 0.01
-            offset_y = 0.01
-            offset_z = 0.0
+            offset_x = 0.005
+            offset_y = 0.0
+            offset_z = 0.02
             angle_offset = 0.0
             angle_deviation = 1 #np.cos(angle_offset)
 

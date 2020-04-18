@@ -27,6 +27,24 @@
           </script>
         </material>
       </visual>
+
+      <inertial>
+        <pose>0.000779 0.001330 0.012974 0 0 0</pose>
+        <mass>0.40</mass>
+        <inertia>
+          <!-- | ixx ixy ixz |
+          | ixy iyy iyz |
+          | ixz iyz izz | -->
+
+          <ixx>0.000001</ixx>
+          <ixy>0.0</ixy>
+          <ixz>0.0</ixz>
+          <iyy>0.0</iyy>
+          <iyz>0.0</iyz>
+          <izz>0.000001</izz>
+        </inertia>
+      </inertial>
+
     </link>
   </model>
 </sdf>

@@ -33,12 +33,12 @@ class Kinect:
 
     def set_point(self,data):
         self.cloud.header=data.header
-	self.cloud.height=data.height
-	self.cloud.width=data.width
-	self.cloud.is_bigendian=data.is_bigendian
-	self.cloud.point_step=data.point_step
-	self.cloud.row_step=data.row_step
-	self.cloud.is_dense=data.is_dense
+    	self.cloud.height=data.height
+    	self.cloud.width=data.width
+    	self.cloud.is_bigendian=data.is_bigendian
+    	self.cloud.point_step=data.point_step
+    	self.cloud.row_step=data.row_step
+    	self.cloud.is_dense=data.is_dense
         self.cloud.data= data.data;
         self.cloud.fields = data.fields	
         self.has_cloud=0

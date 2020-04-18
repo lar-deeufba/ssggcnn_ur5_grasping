@@ -42,481 +42,536 @@ GRIPPER_INIT = True # Tells the node that the gripper was started
 PICKING = False # Tells the node that the object must follow the gripper
 
 def parse_args():
-    parser = argparse.ArgumentParser(description='AAPF_Orientation')
-    parser.add_argument('--gazebo', action='store_true', help='Set the parameters related to the simulated enviroonment in Gazebo')
-    args = parser.parse_args()
-    return args
+	parser = argparse.ArgumentParser(description='AAPF_Orientation')
+	parser.add_argument('--gazebo', action='store_true', help='Set the parameters related to the simulated enviroonment in Gazebo')
+	args = parser.parse_args()
+	return args
 
 class vel_control(object):
-    def __init__(self, args, joint_values = None):
-        rospy.init_node('command_GGCNN_ur5')
+	def __init__(self, args, joint_values = None):
+		rospy.init_node('command_GGCNN_ur5')
 
-        self.args = args
-        self.joint_values_home = joint_values
+		self.args = args
+		self.joint_values_home = joint_values
 
-        # Topic used to publish vel commands
-        self.pub_vel = rospy.Publisher('/joint_group_vel_controller/command', Float64MultiArray,  queue_size=1)
+		# Topic used to publish vel commands
+		self.pub_vel = rospy.Publisher('/joint_group_vel_controller/command', Float64MultiArray,  queue_size=1)
 
-        self.joint_vels_gripper = Float64MultiArray()
-        self.pub_vel_gripper = rospy.Publisher('/gripper_controller_vel/command', Float64MultiArray,  queue_size=1)
+		self.joint_vels_gripper = Float64MultiArray()
+		self.pub_vel_gripper = rospy.Publisher('/gripper_controller_vel/command', Float64MultiArray,  queue_size=1)
 
-        # Used to perform TF transformations
-        self.tf = TransformListener()
+		# Used to perform TF transformations
+		self.tf = TransformListener()
 
-        # Used to change the controller
-        self.controller_switch = rospy.ServiceProxy('/controller_manager/switch_controller', SwitchController)
+		# Used to change the controller
+		self.controller_switch = rospy.ServiceProxy('/controller_manager/switch_controller', SwitchController)
 
-        # actionClient used to send joint positions
-        self.client = actionlib.SimpleActionClient('pos_based_pos_traj_controller/follow_joint_trajectory', FollowJointTrajectoryAction)
-        print "Waiting for server (pos_based_pos_traj_controller)..."
-        self.client.wait_for_server()
-        print "Connected to server (pos_based_pos_traj_controller)"
-        
-        self.initial_traj_duration = 5.0
-        self.final_traj_duration = 1000.0
+		# actionClient used to send joint positions
+		self.client = actionlib.SimpleActionClient('pos_based_pos_traj_controller/follow_joint_trajectory', FollowJointTrajectoryAction)
+		print "Waiting for server (pos_based_pos_traj_controller)..."
+		self.client.wait_for_server()
+		print "Connected to server (pos_based_pos_traj_controller)"
+		
+		# Used by the traj planner
+		self.initial_traj_duration = 5.0
+		self.final_traj_duration = 500.0
 
-        # Gazebo topics
-        if self.args.gazebo:
-            # For picking
-            self.pub_model_position = rospy.Publisher('/gazebo/set_link_state', LinkState, queue_size=5)
-            self.model_coordinates = rospy.ServiceProxy( '/gazebo/get_link_state', GetLinkState)
-            rospy.Subscriber('gazebo/model_states', ModelStates, self.get_model_state_subscriber, queue_size=5)
+		# Gazebo topics
+		if self.args.gazebo:
+			# For picking
+			self.pub_model_position = rospy.Publisher('/gazebo/set_link_state', LinkState, queue_size=10)
+			self.model_coordinates = rospy.ServiceProxy( '/gazebo/get_link_state', GetLinkState)
+			rospy.Subscriber('gazebo/model_states', ModelStates, self.get_model_state_subscriber, queue_size=10)
 
-            # Subscriber used to read joint values
-            rospy.Subscriber('/joint_states', JointState, self.ur5_actual_position, queue_size=2)
-            rospy.sleep(1.0)
-            
+			# Subscriber used to read joint values
+			rospy.Subscriber('/joint_states', JointState, self.ur5_actual_position, queue_size=2)
+			rospy.sleep(1.0)
+			
+			# USED FOR COLLISION DETECTION
+			self.finger_links = ['robotiq_85_right_finger_tip_link', 'robotiq_85_left_finger_tip_link']
+			# LEFT GRIPPER
+			self.string = ""
+			rospy.Subscriber('/left_finger_bumper_vals', ContactsState, self.monitor_contacts_left_finger) # ContactState
+			self.left_collision = False
+			self.contactState_left = ContactState()
+			# RIGHT GRIPPER
+			rospy.Subscriber('/right_finger_bumper_vals', ContactsState, self.monitor_contacts_right_finger) # ContactState
+			self.right_collision = False
+			self.contactState_right = ContactState()
+			
+		# GGCNN
+		self.joint_values_ggcnn = []
+		self.posCB = []
+		self.ori = []
+		self.grasp_cartesian_pose = []
+		self.gripper_angle_grasp = 0.0
+		rospy.Subscriber('ggcnn/out/command', Float32MultiArray, self.ggcnn_command, queue_size=10)
 
-            # LEFT GRIPPER
-            self.string = ""
-            rospy.Subscriber('/left_finger_bumper_vals', ContactsState, self.monitor_contacts_left_finger) # ContactState
-            self.left_collision = False
-            self.contactState_left = ContactState()
+		# Standard attributes used to send joint position commands
+		self.joint_vels = Float64MultiArray()
+		self.goal = FollowJointTrajectoryGoal()
+		self.goal.trajectory = JointTrajectory()
+		self.goal.trajectory.joint_names = ['shoulder_pan_joint', 'shoulder_lift_joint',
+											'elbow_joint', 'wrist_1_joint', 'wrist_2_joint',
+											'wrist_3_joint']
+		self.initial_time = 4
 
-            # RIGHT GRIPPER
-            rospy.Subscriber('/right_finger_bumper_vals', ContactsState, self.monitor_contacts_right_finger) # ContactState
-            self.right_collision = False
-            self.contactState_right = ContactState()
-            
-        # GGCNN
-        self.joint_values_ggcnn = []
-        self.posCB = []
-        self.ori = []
-        rospy.Subscriber('ggcnn/out/command', Float32MultiArray, self.ggcnn_command, queue_size=10)
+		# Robotiq control
+		self.pub_gripper_command = rospy.Publisher('Robotiq2FGripperRobotOutput', outputMsg.Robotiq2FGripper_robot_output, queue_size=1)
+		self.d = None # msg received from GGCN
+		self.gripper_max_width = 0.14
 
-        # Standard attributes used to send joint position commands
-        self.joint_vels = Float64MultiArray()
-        self.goal = FollowJointTrajectoryGoal()
-        self.goal.trajectory = JointTrajectory()
-        self.goal.trajectory.joint_names = ['shoulder_pan_joint', 'shoulder_lift_joint',
-                                            'elbow_joint', 'wrist_1_joint', 'wrist_2_joint',
-                                            'wrist_3_joint']
-        self.initial_time = 4
+		# Denavit-Hartenberg parameters of UR5
+		# The order of the parameters is d1, SO, EO, a2, a3, d4, d45, d5, d6
+		self.ur5_param = (0.089159, 0.13585, -0.1197, 0.425, 0.39225, 0.10915, 0.093, 0.09465, 0.0823 + 0.15)
 
-        # Robotiq control
-        self.pub_gripper_command = rospy.Publisher('Robotiq2FGripperRobotOutput', outputMsg.Robotiq2FGripper_robot_output, queue_size=1)
-        self.d = None # msg received from GGCN
+	def turn_velocity_controller_on(self):
+		self.controller_switch('joint_group_vel_controller', 'pos_based_pos_traj_controller', 1)
+		
+	def turn_position_controller_on(self):
+		self.controller_switch('pos_based_pos_traj_controller', 'joint_group_vel_controller', 1)
 
-        # Denavit-Hartenberg parameters of UR5
-        # The order of the parameters is d1, SO, EO, a2, a3, d4, d45, d5, d6
-        self.ur5_param = (0.089159, 0.13585, -0.1197, 0.425, 0.39225, 0.10915, 0.093, 0.09465, 0.0823 + 0.15)
+	def monitor_contacts_left_finger(self, msg):
+		if msg.states:
+			# print(msg)
+			self.left_collision = True
+			string = msg.states[0].collision1_name
+			string_collision = re.findall(r'::(.+?)::',string)[0]
+			if string_collision in self.finger_links:
+				string = msg.states[0].collision2_name
+				self.string = re.findall(r'::(.+?)::',string)[0]
+			self.string = string_collision
+		else:
+			self.left_collision = False
 
-    def turn_velocity_controller_on(self):
-        self.controller_switch('joint_group_vel_controller', 'pos_based_pos_traj_controller', 1)
-        
-    def turn_position_controller_on(self):
-        self.controller_switch('pos_based_pos_traj_controller', 'joint_group_vel_controller', 1)
+	def monitor_contacts_right_finger(self, msg):
+		if msg.states:
+			self.right_collision = True
+			string = msg.states[0].collision1_name
+			string_collision = re.findall(r'::(.+?)::',string)[0]
+			if string_collision in self.finger_links:
+				string = msg.states[0].collision2_name
+				self.string = re.findall(r'::(.+?)::',string)[0]
+			self.string = string_collision
+		else:
+			self.right_collision = False
 
-    def monitor_contacts_left_finger(self, msg):
-        if msg.states:
-            self.left_collision = True
-            string = msg.states[0].collision1_name
-            self.string = re.findall(r'::(.+?)::',string)[0]
-        else:
-            self.left_collision = False
+	"""
+	The joint states published by /joint_staes of the UR5 robot are in wrong order.
+	/joint_states topic normally publishes the joint in the following order:
+	[elbow_joint, shoulder_lift_joint, shoulder_pan_joint, wrist_1_joint, wrist_2_joint, wrist_3_joint]
+	But the correct order of the joints that must be sent to the robot is:
+	['shoulder_pan_joint', 'shoulder_lift_joint', 'elbow_joint', 'wrist_1_joint', 'wrist_2_joint', 'wrist_3_joint']
+	"""
+	def ur5_actual_position(self, joint_values_from_ur5):
+		if self.args.gazebo:
+			self.th3, self.robotic, self.th2, self.th1, self.th4, self.th5, self.th6 = joint_values_from_ur5.position
+			# print("Robotic angle: ", self.robotic)
+		else:
+			self.th3, self.th2, self.th1, self.th4, self.th5, self.th6 = joint_values_from_ur5.position
+		
+		self.actual_position = [self.th1, self.th2, self.th3, self.th4, self.th5, self.th6]
 
-    def monitor_contacts_right_finger(self, msg):
-        if msg.states:
-            self.right_collision = True
-            string = msg.states[0].collision1_name
-            self.string = re.findall(r'::(.+?)::',string)[0]
-        else:
-            self.right_collision = False
+		# max_distance = 0.085
+		# angular_coeff = 0.11
+		# K = 1.5
+		# angle = (max_distance - self.d[-2]) / angular_coeff * K
+		# print(angle)
 
-    """
-    The joint states published by /joint_staes of the UR5 robot are in wrong order.
-    /joint_states topic normally publishes the joint in the following order:
-    [elbow_joint, shoulder_lift_joint, shoulder_pan_joint, wrist_1_joint, wrist_2_joint, wrist_3_joint]
-    But the correct order of the joints that must be sent to the robot is:
-    ['shoulder_pan_joint', 'shoulder_lift_joint', 'elbow_joint', 'wrist_1_joint', 'wrist_2_joint', 'wrist_3_joint']
-    """
-    def ur5_actual_position(self, joint_values_from_ur5):
-        if self.args.gazebo:
-            self.th3, self.robotic, self.th2, self.th1, self.th4, self.th5, self.th6 = joint_values_from_ur5.position
-            # print("Robotic angle: ", self.robotic)
-        else:
-            self.th3, self.th2, self.th1, self.th4, self.th5, self.th6 = joint_values_from_ur5.position
-        
-        self.actual_position = [self.th1, self.th2, self.th3, self.th4, self.th5, self.th6]
+	"""
+	GGCNN Command Subscriber Callback
+	"""
+	def ggcnn_command(self, msg):
+		# msg = rospy.wait_for_message('/ggcnn/out/command', Float32MultiArray)
+		self.tf.waitForTransform("object_link", "base_link", rospy.Time(), rospy.Duration(4.0))
+		self.tf.waitForTransform("camera_depth_optical_frame", "object_detected", rospy.Time(), rospy.Duration(4.0))
+		self.d = list(msg.data)
+		# posCB is the position of the object frame related to the base_link
+		self.posCB, _ = self.tf.lookupTransform("base_link", "object_link", rospy.Time())
+		_, oriObjCam = self.tf.lookupTransform("camera_depth_optical_frame", "object_detected", rospy.Time())
+		self.ori = euler_from_quaternion(oriObjCam)
 
-    def get_link_position_picking(self):
-        link_name = self.string
-        model_coordinates = self.model_coordinates(self.string, 'wrist_3_link')
-        self.model_pose_picking = model_coordinates.link_state.pose
+	def get_link_position_picking(self):
+		link_name = self.string
+		model_coordinates = self.model_coordinates(self.string, 'wrist_3_link')
+		self.model_pose_picking = model_coordinates.link_state.pose
 
-    def get_model_state_subscriber(self, msg):
-        self.object_picking()
+	def get_model_state_subscriber(self, msg):
+		self.object_picking()
 
-    def object_picking(self):
-        global PICKING
+	def object_picking(self):
+		global PICKING
 
-        if PICKING:
-            angle = quaternion_from_euler(1.57, 0.0, 0.0)
-            object_picking = LinkState()
-            object_picking.link_name = "bico_dosador_link"
-            object_picking.pose = Pose(self.model_pose_picking.position, self.model_pose_picking.orientation)
-            object_picking.reference_frame = "wrist_3_link"            
-            self.pub_model_position.publish(object_picking)            
+		if PICKING:
+			angle = quaternion_from_euler(1.57, 0.0, 0.0)
+			object_picking = LinkState()
+			object_picking.link_name = self.string
+			object_picking.pose = Pose(self.model_pose_picking.position, self.model_pose_picking.orientation)
+			object_picking.reference_frame = "wrist_3_link"
+			self.pub_model_position.publish(object_picking)            
 
-    def get_ik(self, pose):
-        """Get the inverse kinematics 
-        
-        Get the inverse kinematics of the UR5 robot using track_IK package giving a desired intial pose
-        
-        Arguments:
-            pose {list} -- A pose representing x, y and z
+	def get_ik(self, pose):
+		"""Get the inverse kinematics 
+		
+		Get the inverse kinematics of the UR5 robot using track_IK package giving a desired intial pose
+		
+		Arguments:
+			pose {list} -- A pose representing x, y and z
 
-        Keyword Arguments:
-            ori {str} -- Define the final orientation of the robot (default: {'pick'})
-        
-        Returns:
-            {list} -- Joint angles or None if track_ik is not able to find a valid solution
-        """
-        grasping_link_offset = 0.15
-        
-        q = quaternion_from_euler(0.0, -3.14, 0.0)
-        # Joint order:
-        # ('shoulder_link', 'upper_arm_link', 'forearm_link', 'wrist_1_link', 'wrist_2_link', 'wrist_3_link', 'tool0')            
-        ik_solver = IK("base_link", "tool0", solve_type="Distance")
-        sol = ik_solver.get_ik([0.2201039360819781, -1.573845095552878, -1.521853400505349, -1.6151347051274518, 1.5704492904506875, 0.0], 
-                pose[0], pose[1], pose[2] + grasping_link_offset, q[0], q[1], q[2], q[3])
-        if sol is not None:
-            sol = list(sol)
-            sol[-1] = 0.0
-            
-        return sol
+		Keyword Arguments:
+			ori {str} -- Define the final orientation of the robot (default: {'pick'})
+		
+		Returns:
+			{list} -- Joint angles or None if track_ik is not able to find a valid solution
+		"""
+		grasping_link_offset = 0.15
+		
+		q = quaternion_from_euler(0.0, -3.14, 0.0)
+		# Joint order:
+		# ('shoulder_link', 'upper_arm_link', 'forearm_link', 'wrist_1_link', 'wrist_2_link', 'wrist_3_link', 'tool0')            
+		ik_solver = IK("base_link", "tool0", solve_type="Distance")
+		sol = ik_solver.get_ik([0.2201039360819781, -1.573845095552878, -1.521853400505349, -1.6151347051274518, 1.5704492904506875, 0.0], 
+				pose[0], pose[1], pose[2] + grasping_link_offset, q[0], q[1], q[2], q[3])
+		if sol is not None:
+			sol = list(sol)
+			sol[-1] = 0.0
+			
+		return sol
 
-    """
-    Quintic polynomial trajectory
-    """
-    def traj_planner(self, cart_pos, ggcnn = False, way_points_number = 10):
-        """
-        pp - Position points
-        vp - Velocity points
-        """
-        if ggcnn:
-            cart_pos = self.posCB
+	"""
+	Quintic polynomial trajectory
+	"""
+	def traj_planner(self, cart_pos, grasp_step = 'move', way_points_number = 10):
+		"""
+		pp - Position points
+		vp - Velocity points
+		"""
+		
+		if grasp_step == 'grasp':
+			self.grasp_cartesian_pose[-1] -= 0.1
+			joint_pos = self.get_ik(self.grasp_cartesian_pose)
+			joint_pos[-1] = self.ori[-1]
+		elif grasp_step == 'pregrasp':
+			self.grasp_cartesian_pose = deepcopy(self.posCB)
+			self.grasp_cartesian_pose[-1] += 0.1
+			joint_pos = self.get_ik(self.grasp_cartesian_pose)
+			joint_pos[-1] = self.ori[-1]
+			self.gripper_angle_grasp = deepcopy(self.d[-2])
+		elif grasp_step == 'move':
+			joint_pos = self.get_ik(cart_pos)
+			joint_pos[-1] = 0.0
 
-        v0 = a0 = vf = af = 0
-        t0 = self.initial_traj_duration
-        tf = (t0 + self.final_traj_duration) / way_points_number # tf by way point
-        t = tf / 10 # for each movement
-        ta = tf / 10 # to complete each movement
-        a = [0.0]*6
-        pos_points, vel_points, acc_points = [0.0]*6, [0.0]*6, [0.0]*6
-        joint_pos = self.get_ik(cart_pos)
+		v0 = a0 = vf = af = 0
+		t0 = self.initial_traj_duration
+		tf = (t0 + self.final_traj_duration) / way_points_number # tf by way point
+		t = tf / 10 # for each movement
+		ta = tf / 10 # to complete each movement
+		a = [0.0]*6
+		pos_points, vel_points, acc_points = [0.0]*6, [0.0]*6, [0.0]*6
+		
+		goal = FollowJointTrajectoryGoal()
+		goal.trajectory = JointTrajectory()
+		goal.trajectory.joint_names = ['shoulder_pan_joint', 'shoulder_lift_joint',
+											'elbow_joint', 'wrist_1_joint', 'wrist_2_joint',
+											'wrist_3_joint']
 
-        if ggcnn:
-            joint_pos[-1] = 0.0 # FOR TEST GGCNN
+		for i in range(6):
+			q0 = self.actual_position[i]
+			qf = joint_pos[i]
 
-        goal = FollowJointTrajectoryGoal()
-        goal.trajectory = JointTrajectory()
-        goal.trajectory.joint_names = ['shoulder_pan_joint', 'shoulder_lift_joint',
-                                            'elbow_joint', 'wrist_1_joint', 'wrist_2_joint',
-                                            'wrist_3_joint']
+			b = np.array([q0,v0,a0,qf,vf,af]).transpose()
+			m = np.array([[1, t0, t0**2,   t0**3,    t0**4,    t0**5],
+						  [0,  1,  2*t0, 3*t0**2,  4*t0**3,  5*t0**4],
+						  [0,  0,     2,    6*t0, 12*t0**2, 20*t0**3],
+						  [1, tf, tf**2,   tf**3,    tf**4,    tf**5],
+						  [0,  1,  2*tf, 3*tf**2,  4*tf**3,  5*tf**4],
+						  [0,  0,     2,    6*tf, 12*tf**2, 20*tf**3]])
+			a[i] = np.linalg.inv(m).dot(b)
 
-        for i in range(6):
-            q0 = self.actual_position[i]
-            qf = joint_pos[i]
+		for i in range(way_points_number):
+			for j in range(6):
+				pos_points[j] =   a[j][0] +   a[j][1]*t +    a[j][2]*t**2 +    a[j][3]*t**3 +   a[j][4]*t**4 + a[j][5]*t**5
+				vel_points[j] =   a[j][1] + 2*a[j][2]*t +  3*a[j][3]*t**2 +  4*a[j][4]*t**3 + 5*a[j][5]*t**4
+				acc_points[j] = 2*a[j][2] + 6*a[j][3]*t + 12*a[j][4]*t**2 + 20*a[j][5]*t**3
 
-            b = np.array([q0,v0,a0,qf,vf,af]).transpose()
-            m = np.array([[1, t0, t0**2,   t0**3,    t0**4,    t0**5],
-                          [0,  1,  2*t0, 3*t0**2,  4*t0**3,  5*t0**4],
-                          [0,  0,     2,    6*t0, 12*t0**2, 20*t0**3],
-                          [1, tf, tf**2,   tf**3,    tf**4,    tf**5],
-                          [0,  1,  2*tf, 3*tf**2,  4*tf**3,  5*tf**4],
-                          [0,  0,     2,    6*tf, 12*tf**2, 20*tf**3]])
-            a[i] = np.linalg.inv(m).dot(b)
+			goal.trajectory.points.append(JointTrajectoryPoint(positions = pos_points,
+															   velocities = vel_points,
+															   accelerations = acc_points,
+															   time_from_start = rospy.Duration(t))) #default 0.1*i + 5
+			t += ta
 
-        for i in range(way_points_number):
-            for j in range(6):
-                pos_points[j] =   a[j][0] +   a[j][1]*t +    a[j][2]*t**2 +    a[j][3]*t**3 +   a[j][4]*t**4 + a[j][5]*t**5
-                vel_points[j] =   a[j][1] + 2*a[j][2]*t +  3*a[j][3]*t**2 +  4*a[j][4]*t**3 + 5*a[j][5]*t**4
-                acc_points[j] = 2*a[j][2] + 6*a[j][3]*t + 12*a[j][4]*t**2 + 20*a[j][5]*t**3
+		self.client.send_goal(goal)
 
-            goal.trajectory.points.append(JointTrajectoryPoint(positions = pos_points,
-                                                               velocities = vel_points,
-                                                               accelerations = acc_points,
-                                                               time_from_start = rospy.Duration(t))) #default 0.1*i + 5
-            t += ta
+	def genCommand(self, char, command, pos = None):
+		"""Update the command according to the character entered by the user."""    
 
-        self.client.send_goal(goal)
-        # self.client.wait_for_result()
+		if char == 'a':
+			# command = outputMsg.Robotiq2FGripper_robot_output();
+			command.rACT = 1 # Gripper activation
+			command.rGTO = 1 # Go to position request
+			command.rSP  = 255 # Speed
+			command.rFR  = 150 # Force
 
-    """
-    GGCNN Command Subscriber Callback
-    """
-    def ggcnn_command(self, msg):
-        # msg = rospy.wait_for_message('/ggcnn/out/command', Float32MultiArray)
-        self.tf.waitForTransform("object_link", "base_link", rospy.Time(), rospy.Duration(4.0))
-        self.tf.waitForTransform("camera_depth_optical_frame", "object_detected", rospy.Time(), rospy.Duration(4.0))
-        self.d = list(msg.data)
-        # posCB is the position of the object frame related to the base_link
-        self.posCB, _ = self.tf.lookupTransform("base_link", "object_link", rospy.Time())
-        _, oriObjCam = self.tf.lookupTransform("camera_depth_optical_frame", "object_detected", rospy.Time())
-        self.ori = euler_from_quaternion(oriObjCam)
-                
-    def genCommand(self, char, command, pos = None):
-        """Update the command according to the character entered by the user."""    
+		if char == 'r':
+			command.rACT = 0
 
-        if char == 'a':
-            # command = outputMsg.Robotiq2FGripper_robot_output();
-            command.rACT = 1 # Gripper activation
-            command.rGTO = 1 # Go to position request
-            command.rSP  = 255 # Speed
-            command.rFR  = 150 # Force
+		if char == 'c':
+			command.rACT = 1
+			command.rGTO = 1
+			command.rATR = 0
+			command.rPR = 255
+			command.rSP = 40
+			command.rFR = 150
+			
+		# @param pos Gripper width in meters. [0, 0.087]
+		if char == 'p':
+			command.rACT = 1
+			command.rGTO = 1
+			command.rATR = 0
+			command.rPR = int(np.clip((13.-230.)/self.gripper_max_width * self.d[-2] + 230., 0, 255))
+			command.rSP = 40
+			command.rFR = 150
 
-        if char == 'r':
-            command.rACT = 0
+		if char == 'o':
+			command.rACT = 1
+			command.rGTO = 1
+			command.rATR = 0
+			command.rPR = 0
+			command.rSP = 40
+			command.rFR = 150
 
-        if char == 'c':
-            command.rACT = 1
-            command.rGTO = 1
-            command.rATR = 0
-            command.rPR = 255
-            command.rSP = 40
-            command.rFR = 150
-            
-        # @param pos Gripper width in meters. [0, 0.087]
-        if char == 'p':
-            command.rACT = 1
-            command.rGTO = 1
-            command.rATR = 0
-            command.rPR = int(np.clip((13.-230.)/0.14 * self.d[-2] + 230., 0, 255))
-            command.rSP = 40
-            command.rFR = 150
+		return command
 
-        if char == 'o':
-            command.rACT = 1
-            command.rGTO = 1
-            command.rATR = 0
-            command.rPR = 0
-            command.rSP = 40
-            command.rFR = 150
+	def command_gripper(self, action):
+		command = outputMsg.Robotiq2FGripper_robot_output();
+		command = self.genCommand(action, command)
+		self.pub_gripper_command.publish(command)  
 
-        return command
+	"""
+	This method check if the goal position was reached
+	"""
+	def all_close(self, goal, tolerance = 0.015):
+		error = np.sum([(self.actual_position[i] - goal[i])**2 for i in range(6)])
+		if error > tolerance:
+			return False
 
-    def command_gripper(self, action):
-        command = outputMsg.Robotiq2FGripper_robot_output();
-        command = self.genCommand(action, command)
-        self.pub_gripper_command.publish(command)  
+		return True
 
-    """
-    This method check if the goal position was reached
-    """
-    def all_close(self, goal, tolerance = 0.015):
-        error = np.sum([(self.actual_position[i] - goal[i])**2 for i in range(6)])
-        if error > tolerance:
-            return False
+	def gripper_init(self):
+		global CLOSE_GRIPPER_VEL, OPEN_GRIPPER_VEL
+		global MIN_GRIPPER_OPEN_INIT, MAX_GRIPPER_CLOSE_INIT
 
-        return True
+		rate = rospy.Rate(40)
+		joint_vels_gripper = Float64MultiArray()
+		if self.robotic < MIN_GRIPPER_OPEN_INIT:
+			joint_vels_gripper.data = np.array([CLOSE_GRIPPER_VEL])
+			self.pub_vel_gripper.publish(joint_vels_gripper)
+			while not rospy.is_shutdown():
+				if self.robotic > MAX_GRIPPER_CLOSE_INIT:
+					break
+				rate.sleep()
 
-    def gripper_init(self):
-        global CLOSE_GRIPPER_VEL, OPEN_GRIPPER_VEL
-        global MIN_GRIPPER_OPEN_INIT, MAX_GRIPPER_CLOSE_INIT
+		elif self.robotic > MAX_GRIPPER_CLOSE_INIT:
+			joint_vels_gripper.data = np.array([OPEN_GRIPPER_VEL])
+			self.pub_vel_gripper.publish(joint_vels_gripper)
+			while not rospy.is_shutdown():
+				if self.robotic < MIN_GRIPPER_OPEN_INIT:
+					break
+				rate.sleep()
+		
+		joint_vels_gripper.data = np.array([0.0])
+		self.pub_vel_gripper.publish(joint_vels_gripper)
 
-        rate = rospy.Rate(60)
-        joint_vels_gripper = Float64MultiArray()
-        if self.robotic < MIN_GRIPPER_OPEN_INIT:
-            joint_vels_gripper.data = np.array([CLOSE_GRIPPER_VEL])
-            self.pub_vel_gripper.publish(joint_vels_gripper)
-            while not rospy.is_shutdown():
-                if self.robotic > MAX_GRIPPER_CLOSE_INIT:
-                    break
-                rate.sleep()
+	"""
+	Control the gripper by using velocity controller
+	"""
+	def gripper_vel_control(self, action):
+		global GRIPPER_INIT, MIN_GRIPPER_OPEN_INIT
+		global CLOSE_GRIPPER_VEL, OPEN_GRIPPER_VEL
 
-        elif self.robotic > MAX_GRIPPER_CLOSE_INIT:
-            joint_vels_gripper.data = np.array([OPEN_GRIPPER_VEL])
-            self.pub_vel_gripper.publish(joint_vels_gripper)
-            while not rospy.is_shutdown():
-                if self.robotic < MIN_GRIPPER_OPEN_INIT:
-                    break
-                rate.sleep()
-        
-        joint_vels_gripper.data = np.array([0.0])
-        self.pub_vel_gripper.publish(joint_vels_gripper)
+		max_distance = 0.085
+		angular_coeff = 0.11
+		K = 1.5
+		angle = (max_distance - self.gripper_angle_grasp) / angular_coeff * K
+		print("Angle: ", angle)
 
-    """
-    Control the gripper by using velocity controller
-    """
-    def gripper_vel_control(self, action):
-        global GRIPPER_INIT
-        global CLOSE_GRIPPER_VEL, OPEN_GRIPPER_VEL
+		rate = rospy.Rate(100)
 
-        rate = rospy.Rate(120)
+		if action == 'open':
+			self.joint_vels_gripper.data = np.array([OPEN_GRIPPER_VEL])
+			self.pub_vel_gripper.publish(self.joint_vels_gripper)
+			while not rospy.is_shutdown() and GRIPPER_INIT and self.robotic > MIN_GRIPPER_OPEN_INIT:
+				rate.sleep()
+		elif action == 'close':
+			# Translating this while into English: 
+			# While rospy is not shutdown and gripper is still running and the angle of the gripper is not greater than 0.7
+			# and colliisions of borth gripper occur (the collision must occur to both grippers tip in order to stop them.
+			# That's why we use OR
+			while not rospy.is_shutdown() and GRIPPER_INIT and not self.robotic > 0.7 and not self.left_collision and not self.right_collision:
+				self.joint_vels_gripper.data = np.array([CLOSE_GRIPPER_VEL])
+				self.pub_vel_gripper.publish(self.joint_vels_gripper)
+				rate.sleep()
+		elif action == 'close_to_angle':
+			while not rospy.is_shutdown() and GRIPPER_INIT and not self.robotic > angle:
+				self.joint_vels_gripper.data = np.array([CLOSE_GRIPPER_VEL])
+				self.pub_vel_gripper.publish(self.joint_vels_gripper)
+				rate.sleep()    
 
-        if action == 'open':
-            self.joint_vels_gripper.data = np.array([OPEN_GRIPPER_VEL])
-            self.pub_vel_gripper.publish(self.joint_vels_gripper)
-            while not rospy.is_shutdown() and GRIPPER_INIT and self.robotic > 0.1:
-                rate.sleep()
-        elif action == 'close':
-            # Translating this while into English: 
-            # While rospy is not shutdown and gripper is still running and the angle of the gripper is not greater than 0.7
-            # and colliisions of borth gripper occur (the collision must occur to both grippers tip in order to stop them.
-            # That's why we use OR
-            while not rospy.is_shutdown() and GRIPPER_INIT and not self.robotic > 0.7 and not self.left_collision and not self.right_collision:
-                self.joint_vels_gripper.data = np.array([CLOSE_GRIPPER_VEL])
-                self.pub_vel_gripper.publish(self.joint_vels_gripper)
-                rate.sleep()
-            
-        # stops the robot after the goal is reached
-        rospy.loginfo("Gripper stopped!")
-        self.joint_vels_gripper.data = np.array([0.0])
-        self.pub_vel_gripper.publish(self.joint_vels_gripper)
+		# stops the robot after the goal is reached
+		rospy.loginfo("Gripper stopped!")
+		self.joint_vels_gripper.data = np.array([0.0])
+		self.pub_vel_gripper.publish(self.joint_vels_gripper)
 
-    """
-    Send the HOME position to the robot
-    self.client.wait_for_result() won't work well in Gazebo.
-    Instead, a while loop has been created to ensure that the robot reaches the
-    goal even after the failure.
-    In order to avoid the gripper to keep moving after the node is killed, the method gripper_init() is also called
-    """
-    def home_pos(self):
-        global GRIPPER_INIT, PICKING
+	"""
+	Send the HOME position to the robot
+	self.client.wait_for_result() won't work well in Gazebo.
+	Instead, a while loop has been created to ensure that the robot reaches the
+	goal even after the failure.
+	In order to avoid the gripper to keep moving after the node is killed, the method gripper_init() is also called
+	"""
+	def home_pos(self):
+		global GRIPPER_INIT
 
-        self.turn_position_controller_on()
-        rospy.sleep(0.1)
+		# self.turn_position_controller_on()
+		# rospy.sleep(0.1)
 
-        PICKING = False
+		self.joint_vels_gripper.data = np.array([0.0])
+		self.pub_vel_gripper.publish(self.joint_vels_gripper)
 
-        # if GRIPPER_INIT and self.args.gazebo:
-            # self.gripper_init()
+		# First point is current position
+		try:
+			self.goal.trajectory.points = [(JointTrajectoryPoint(positions=self.joint_values_home, velocities=[0]*6, time_from_start=rospy.Duration(self.initial_traj_duration)))]
+			self.client.send_goal(self.goal)
+			self.client.wait_for_result()
+		except KeyboardInterrupt:
+			self.client.cancel_goal()
+			raise
+		except:
+			raise
 
-        # First point is current position
-        try:
-            self.goal.trajectory.points = [(JointTrajectoryPoint(positions=self.joint_values_home, velocities=[0]*6, time_from_start=rospy.Duration(self.initial_traj_duration)))]
-            self.client.send_goal(self.goal)
-            self.client.wait_for_result()
-        except KeyboardInterrupt:
-            self.client.cancel_goal()
-            raise
-        except:
-            raise
+		print "\n==== Goal reached!"
 
-        print "\n==== Goal reached!"
+	"""
+	This method was created because the real robot always reach the correct 
+	position but it is not always true for gazebo
+	"""
+	def set_pos_robot(self, joint_values_param, time = 14.0):
+		rospy.sleep(0.1)
+		self.turn_position_controller_on()
 
-    """
-    This method was created because the real robot always reach the correct 
-    position but it is not always true for gazebo
-    """
-    def set_pos_robot(self, joint_values_param, time = 18.0):
-        rospy.sleep(0.1)
-        self.turn_position_controller_on()
+		joint_values = deepcopy(joint_values_param)
 
-        joint_values = deepcopy(joint_values_param)
+		# First point is current position
+		try:
+			self.goal.trajectory.points = [(JointTrajectoryPoint(positions=joint_values, velocities=[0]*6, time_from_start=rospy.Duration(time)))]
+			if self.args.gazebo:
+				print(self.actual_position)
+				if not self.all_close(joint_values):
+					self.client.send_goal(self.goal)
+					self.client.wait_for_result()
+					while not self.all_close(joint_values):
+						print(self.actual_position)
+						self.client.send_goal(self.goal)
+						self.client.wait_for_result()
+			else:
+				self.client.send_goal(self.goal)
+				self.client.wait_for_result()
+		except KeyboardInterrupt:
+			self.client.cancel_goal()
+			raise
+		except:
+			raise
 
-        # First point is current position
-        try:
-            self.goal.trajectory.points = [(JointTrajectoryPoint(positions=joint_values, velocities=[0]*6, time_from_start=rospy.Duration(time)))]
-            if self.args.gazebo:
-                if not self.all_close(joint_values):
-                    self.client.send_goal(self.goal)
-                    self.client.wait_for_result()
-                    while not self.all_close(joint_values):
-                        self.client.send_goal(self.goal)
-                        self.client.wait_for_result()
-            else:
-                self.client.send_goal(self.goal)
-                self.client.wait_for_result()
-        except KeyboardInterrupt:
-            self.client.cancel_goal()
-            raise
-        except:
-            raise
-
-        print "\n==== Goal reached!"
+		print "\n==== Goal reached!"
 
 def main():
-    global GRIPPER_INIT, PICKING
+	global GRIPPER_INIT, PICKING
 
-    arg = parse_args()
+	arg = parse_args()
 
-    # Turn position controller ON
-    ur5_vel = vel_control(arg)
-    ur5_vel.turn_position_controller_on()
-    point_init = [-0.4, 0.0, 0.2] #[-0.40, 0.0, 0.15]
-    joint_values_home = ur5_vel.get_ik(point_init)
-    ur5_vel.joint_values_home = joint_values_home
+	# Turn position controller ON
+	ur5_vel = vel_control(arg)
+	ur5_vel.turn_position_controller_on()
+	point_init = [-0.4, 0.0, 0.15] # [-0.35, 0.03, 0.05] - behind box - #[-0.40, 0.0, 0.15] - up
+	joint_values_home = ur5_vel.get_ik(point_init)
+	ur5_vel.joint_values_home = joint_values_home
 
-    # Send the robot to the custom HOME position
-    raw_input("==== Press enter to 'home' the robot!")
-    rospy.on_shutdown(ur5_vel.home_pos)
-    ur5_vel.set_pos_robot(ur5_vel.joint_values_home)
-    
-    raw_input("==== Press enter to init to gripper!")
-    if arg.gazebo:
-        rospy.loginfo("Starting the gripper in Gazebo! Please wait...")
-        ur5_vel.gripper_init()
-        rospy.loginfo("Gripper started!")        
-    else:
-        rospy.loginfo("Starting the real gripper! Please wait...")
-        ur5_vel.command_gripper('r')
-        rospy.sleep(0.5)
-        ur5_vel.command_gripper('a')
-        ur5_vel.command_gripper('o')
-    
-    GRIPPER_INIT = True
+	# Send the robot to the custom HOME position
+	raw_input("==== Press enter to 'home' the robot!")
+	rospy.on_shutdown(ur5_vel.home_pos)
+	ur5_vel.traj_planner([-0.35, 0.03, 0.05])
+	# ur5_vel.set_pos_robot(joint_values_home)
+	
+	raw_input("==== Press enter to init to gripper!")
+	if arg.gazebo:
+		rospy.loginfo("Starting the gripper in Gazebo! Please wait...")
+		ur5_vel.gripper_init()
+		rospy.loginfo("Gripper started!")   
+	else:
+		rospy.loginfo("Starting the real gripper! Please wait...")
+		ur5_vel.command_gripper('r')
+		rospy.sleep(0.5)
+		ur5_vel.command_gripper('a')
+		ur5_vel.command_gripper('o')
+	
+	GRIPPER_INIT = True
 
-    while not rospy.is_shutdown():
+	while not rospy.is_shutdown():
 
-        # !!! GGCNN is not yet implemented to pick a object in the printer (makerbot)
-        #It closes the gripper before approaching the object
-        #It prevents the gripper to collide with other objects when grasping
-        # if not arg.gazebo:
-        #     raw_input("==== Press enter to close the gripper to a pre-grasp position!")
-        #     ur5_vel.command_gripper('p')
+		# raw_input("==== Press enter to move!")
+		# ur5_vel.traj_planner([-0.35, -0.05, 0.05])
 
-        raw_input("==== Press enter to move the robot to the goal position given by GGCNN!")
-        ur5_vel.traj_planner([], ggcnn = True)
+		# raw_input("==== Press enter to move!")
+		# ur5_vel.traj_planner([-0.35, 0.05, 0.05])
 
-        # As the object iteraction in Gazebo is not working properly, the gripper only closes
-        # when using the real robot
-        raw_input("==== Press enter to close the gripper!")
-        if arg.gazebo:
-            ur5_vel.gripper_vel_control('close')
-        else:
-            raw_input("==== Press enter to close the gripper!")
-            print(ur5_vel.d[-2])
-            ur5_vel.command_gripper('c')
+		raw_input("==== Press enter to move to the pre grasp position!")
+		ur5_vel.traj_planner([], 'pregrasp')
 
-        # Move the robot to put the object down after the robot is move backwards from the printer
-        # Need to be updated
-        raw_input("==== Press enter to move upwards!")
-        ur5_vel.get_link_position_picking()
-        PICKING = True
-        ur5_vel.traj_planner([-0.40, 0.0, 0.40])
+		# !!! GGCNN is not yet implemented to pick a object in the printer (makerbot)
+		#It closes the gripper before approaching the object
+		#It prevents the gripper to collide with other objects when grasping
+		raw_input("==== Press enter to close the gripper to a pre-grasp angle!")
+		if arg.gazebo:
+			ur5_vel.gripper_vel_control('close_to_angle')
+		else:
+			ur5_vel.command_gripper('p')
 
+		raw_input("==== Press enter to move the robot to the goal position given by GGCNN!")
+		ur5_vel.traj_planner([], 'grasp')
 
-        raw_input("==== Press enter to open the gripper!")
-        PICKING = False
-        if arg.gazebo:
-            ur5_vel.gripper_vel_control('open')
-        else:
-            ur5_vel.command_gripper('o')
+		# As the object iteraction in Gazebo is not working properly, the gripper only closes
+		# when using the real robot
+		raw_input("==== Press enter to close the gripper!")
+		if arg.gazebo:
+			ur5_vel.gripper_vel_control('close')
+		else:
+			raw_input("==== Press enter to close the gripper!")
+			ur5_vel.command_gripper('c')
+
+		# Move the robot to put the object down after the robot is move backwards from the printer
+		# Need to be updated
+		raw_input("==== Press enter to move the object upwards!")
+		ur5_vel.get_link_position_picking()
+		rospy.sleep(0.1)
+		PICKING = True
+		ur5_vel.traj_planner([-0.4, 0.0, 0.15])
+
+		raw_input("==== Press enter to move the object to the bin!")
+		ur5_vel.traj_planner([-0.2, -0.3, 0.15])
+
+		raw_input("==== Press enter to open the gripper!")
+		PICKING = False
+		if arg.gazebo:
+			ur5_vel.gripper_vel_control('open')
+		else:
+			ur5_vel.command_gripper('o')
+
+		raw_input("==== Press enter to move to the initial position!")
+		ur5_vel.get_link_position_picking()
+		ur5_vel.traj_planner(point_init)
 
 if __name__ == '__main__':
-    try:
-        main()
-    except rospy.ROSInterruptException:
-	    print "Program interrupted before completion"
+	try:
+		main()
+	except rospy.ROSInterruptException:
+		print "Program interrupted before completion"

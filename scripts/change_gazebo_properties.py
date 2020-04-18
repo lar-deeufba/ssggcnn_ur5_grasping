@@ -7,8 +7,8 @@ import rospy
 
 set_gravity = rospy.ServiceProxy('/gazebo/set_physics_properties', SetPhysicsProperties)
 
-time_step = Float64(0.002) # default: 0.001
-max_update_rate = Float64(500.0) # default: 1000.0
+time_step = Float64(0.004) # default: 0.001
+max_update_rate = Float64(250.0) # default: 1000.0
 gravity = Vector3()
 gravity.x = 0.0
 gravity.y = 0.0

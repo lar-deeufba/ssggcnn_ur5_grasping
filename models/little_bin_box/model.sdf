@@ -1,14 +1,14 @@
 <?xml version="1.0" ?>
 <sdf version="1.5">
-  <model name="Bin Box">
+  <model name="Little Bin Box">
     <static>true</static>
-    <link name="bin_box_link">
+    <link name="little_bin_box_link">
 
       <collision name="collision">
         <geometry>
           <mesh>
-            <uri>model://bin_box/meshes/bin_box.dae</uri>
-            <scale>1.0 1.0 1.0</scale>
+            <uri>model://little_bin_box/meshes/little_bin_box.dae</uri>
+            <scale>0.5 0.5 1.0</scale>
           </mesh>
         </geometry>
       </collision>
@@ -16,14 +16,14 @@
       <visual name="visual">
         <geometry>
           <mesh>
-            <uri>model://bin_box/meshes/bin_box.dae</uri>
-            <scale>1.0 1.0 1.0</scale>
+            <uri>model://little_bin_box/meshes/little_bin_box.dae</uri>
+            <scale>0.5 0.5 1.0</scale>
           </mesh>
         </geometry>
         <material>
           <script>
             <uri>file://media/materials/scripts/gazebo.material</uri>
-            <name>Gazebo/White</name>
+            <name>Gazebo/Black</name>
           </script>
         </material>
       </visual>
