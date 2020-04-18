@@ -132,8 +132,6 @@ def depth_callback(depth_message):
 
         # Substitute nan values by zero
         depth_crop[depth_nan] = 0
-
-
                         
     with TimeIt('Inpaint'):
         # open cv inpainting does weird things at the border.
@@ -258,6 +256,7 @@ def depth_callback(depth_message):
         'Depth crop with square'
         vetx = [-(width/2), (width/2), (width/2), -(width/2), -(width/2)]
         vety = [10, 10, -10, -10, 10]
+        
         X = [ int((vetx[i] * np.cos(ang) - vety[i] * np.sin(ang)) + max_pixel_detected[0]) for i in range(len(vetx))]
         Y = [ int((vety[i] * np.cos(ang) + vetx[i] * np.sin(ang)) + max_pixel_detected[1]) for i in range(len(vetx))]
         rr1, cc1 = circle(max_pixel_detected[0], max_pixel_detected[1], 5)
@@ -267,6 +266,7 @@ def depth_callback(depth_message):
         cv2.line(depth_crop_copy, (Y[1],X[1]), (Y[2],X[2]), (0.2, 0.2, 0.2), 2)
         cv2.line(depth_crop_copy, (Y[2],X[2]), (Y[3],X[3]), (0, 0, 0), 2)
         cv2.line(depth_crop_copy, (Y[3],X[3]), (Y[4],X[4]), (0.2, 0.2, 0.2), 2)
+        cv2.imshow('image',depth_crop_copy)
         depth_with_square.publish(bridge.cv2_to_imgmsg(depth_crop_copy))
         'Depth crop with square'
 

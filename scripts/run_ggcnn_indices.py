@@ -78,14 +78,20 @@ class ssgg_grasping(object):
         # Output publishers.
         self.grasp_pub = rospy.Publisher('ggcnn/img/grasp', Image, queue_size=1)
         self.depth_pub = rospy.Publisher('ggcnn/img/depth', Image, queue_size=1)
-        self.depth_with_square = rospy.Publisher('ggcnn/img/depth_with_square', Image, queue_size=1)
+        self.img_with_square = rospy.Publisher('ggcnn/img/grasp_with_square', Image, queue_size=1)
         self.ang_pub = rospy.Publisher('ggcnn/img/ang', Image, queue_size=1)
         self.cmd_pub = rospy.Publisher('ggcnn/out/command', Float32MultiArray, queue_size=1)
 
+        # Subscribers
+        rospy.Subscriber(self.camera_topic, Image, self.depth_callback, queue_size=10)
+        rospy.Subscriber("/camera/color/image_raw", Image, self.image_callback, queue_size=10)
+
         # Initialise some var
         self.depth = None
+        self.color_img = None
         self.depth_crop = None
-        self.depth_copy = None
+        self.depth_copy_for_point_depth = None
+        self.depth_copy_for_rectangle = None
         self.depth_message = None
         self.pred_out = None
         self.points_out = None
@@ -99,10 +105,7 @@ class ssgg_grasping(object):
         self.width_out = None
         self.ang = 0.0
         self.width = 0.0
-        self.grasping_point = []
-
-        # Subscribers
-        rospy.Subscriber(self.camera_topic, Image, self.depth_callback, queue_size=10)
+        self.grasping_point = []        
 
         # Initialise some globals.
         self.max_pixel_index = np.array([150, 150])
@@ -119,13 +122,16 @@ class ssgg_grasping(object):
         self.fy = K[4]
         self.cy = K[5]
 
+    def image_callback(self, color_msg):
+        color_img = self.bridge.imgmsg_to_cv2(color_msg)
+        color_img = color_img[0 : self.crop_size, (self.width_res - self.crop_size)//2 : (self.width_res - self.crop_size)//2 + self.crop_size]
+        self.color_img = color_img
+
     def depth_callback(self, depth_message):
         self.depth_message = depth_message
         # Depth is the depth image converted into open cv format
         # Real realsense resolution 480x640
         depth = self.bridge.imgmsg_to_cv2(depth_message)
-
-        self.depth_copy = deepcopy(depth)
 
         # 'TEST DEPTH'
         # depth_test_circle = depth.copy()
@@ -136,6 +142,8 @@ class ssgg_grasping(object):
         # depth[0:300, 170:470]
         depth_crop = depth[0 : self.crop_size, (self.width_res - self.crop_size)//2 : (self.width_res - self.crop_size)//2 + self.crop_size]
 
+        self.depth_copy_for_point_depth = deepcopy(depth_crop)
+        
         # Creates a deep copy of the depth_crop image
         depth_crop = depth_crop.copy()
 
@@ -209,7 +217,7 @@ class ssgg_grasping(object):
             ang: End effector orientation (planar)
             width_px: Gripper width in pixel
             g_width and width_m = Gripper width in meters calculated in different ways
-            grasping_point = End effector pose
+            grasping_point = End effector position [x, y, z]
         """
         link_pose, _ = self.transf.lookupTransform("base_link", "grasping_link", rospy.Time(0))
         ROBOT_Z = link_pose[2]
@@ -230,7 +238,7 @@ class ssgg_grasping(object):
         reescaled_height = int(self.max_pixel_index[0])
         reescaled_width = int((self.width_res - self.crop_size) // 2 + self.max_pixel_index[1])
         self.max_pixel_reescaled = [reescaled_height, reescaled_width]
-        point_depth = self.depth_copy[self.max_pixel_reescaled[0], self.max_pixel_reescaled[1]]
+        point_depth = self.depth_copy_for_point_depth[self.max_pixel_index[0], self.max_pixel_index[1]]
 
         # Get the grip width in meters
         width_m = self.width_out / crop_size_width * 2.0 * point_depth * np.tan(self.FOV * crop_size_width / self.height_res / 2.0 / 180.0 * np.pi) / 1000 #* 0.37
@@ -247,24 +255,25 @@ class ssgg_grasping(object):
         Show the depth image with a rectangle representing the grasp
         Image resolution: 300x300
         """
-        rectangle_ang = self.ang - np.pi/2
+        rectangle_ang = self.ang #- np.pi/2
         
-        vetx = [-(self.width_px/2), (self.width_px/2), (self.width_px/2), -(self.width_px/2), -(self.width/2)]
-        vety = [10, 10, -10, -10, 10]
+        # rotation_matrix = [[np.cos(rectangle_ang)]]
+        vetx = [-(self.width_px/2), (self.width_px/2), (self.width_px/2), -(self.width_px/2)]
+        vety = [                10,                10,               -10,                -10]
         
-        X = [ int((vetx[i] * np.cos(self.ang) - vety[i] * np.sin(self.ang)) + self.max_pixel_index[0]) for i in range(len(vetx))]
-        Y = [ int((vety[i] * np.cos(self.ang) + vetx[i] * np.sin(self.ang)) + self.max_pixel_index[1]) for i in range(len(vetx))]
-        
+        X = [ int((     vetx[i]*np.cos(rectangle_ang) + vety[i]*np.sin(rectangle_ang)) + self.max_pixel_index[1]) for i in range(len(vetx))]
+        Y = [ int((-1 * vetx[i]*np.sin(rectangle_ang) + vety[i]*np.cos(rectangle_ang)) + self.max_pixel_index[0]) for i in range(len(vetx))]
+ 
         rr1, cc1 = circle(self.max_pixel_index[0], self.max_pixel_index[1], 5)
-        depth_crop_copy = self.depth_crop.copy()
-        depth_crop_copy[rr1, cc1] = 0.2
-        cv2.line(depth_crop_copy, (Y[0],X[0]), (Y[1],X[1]), (0, 0, 0), 2)
-        cv2.line(depth_crop_copy, (Y[1],X[1]), (Y[2],X[2]), (0.2, 0.2, 0.2), 2)
-        cv2.line(depth_crop_copy, (Y[2],X[2]), (Y[3],X[3]), (0, 0, 0), 2)
-        cv2.line(depth_crop_copy, (Y[3],X[3]), (Y[4],X[4]), (0.2, 0.2, 0.2), 2)
-
-        self.depth_with_square.publish(self.bridge.cv2_to_imgmsg(depth_crop_copy))
-        
+        img_crop_copy = self.depth_copy_for_point_depth.copy()
+        img_crop_copy[rr1, cc1] = 0.2
+        cv2.line(img_crop_copy, (X[0],Y[0]), (X[1],Y[1]), (0, 0, 0), 2)
+        cv2.line(img_crop_copy, (X[1],Y[1]), (X[2],Y[2]), (0.2, 0.2, 0.2), 2)
+        cv2.line(img_crop_copy, (X[2],Y[2]), (X[3],Y[3]), (0, 0, 0), 2)
+        cv2.line(img_crop_copy, (X[3],Y[3]), (X[0],Y[0]), (0.2, 0.2, 0.2), 2)
+        # cv2.imshow('image',img_crop_copy)
+        # cv2.waitKey(1)
+        self.img_with_square.publish(self.bridge.cv2_to_imgmsg(img_crop_copy))#, encoding="rgb8"))
 
     def get_grasp_image(self):
         # Draw grasp markers on the points_out and publish it. (for visualisation)
