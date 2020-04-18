@@ -113,7 +113,7 @@ def depth_callback(depth_message):
         depth = bridge.imgmsg_to_cv2(depth_message)
 
         'TEST DEPTH'
-        depth_test_circle = depth.copy()
+        depth_copy_for_point_depth = depth.copy()
         
         height_res, width_res = depth.shape
         # print("Height_res: ", height_res)
@@ -178,9 +178,9 @@ def depth_callback(depth_message):
         # depth_center.sort()
         # depth_center = depth_center[:10].mean() * 1000.0
 
-    with TimeIt('Resizing'):
+    # with TimeIt('Resizing'):
             # Resize
-        depth_crop = cv2.resize(depth_crop, (crop_size, crop_size), cv2.INTER_AREA)
+        # depth_crop = cv2.resize(depth_crop, (crop_size, crop_size), cv2.INTER_AREA)
 
     with TimeIt('Inference'):
         # Convert depth_crop values to meters
@@ -243,7 +243,7 @@ def depth_callback(depth_message):
         width = width_out[max_pixel[0], max_pixel[1]]
 
         # It preserves the max pixel relative to the 300x300 resolution
-        max_pixel_detected = max_pixel.copy()
+        max_pixel = max_pixel.copy()
 
         # Get max pixel based on the original resolution of the image
         # Convert max_pixel back to uncropped/resized image coordinates in order to do the camera transform.
@@ -251,22 +251,22 @@ def depth_callback(depth_message):
         # max_pixel = np.round(max_pixel).astype(np.int)
         reescaled_height = int(prev_mp[0])
         reescaled_width = int((width_res - crop_size) // 2 + prev_mp[1])
-        max_pixel = [reescaled_height, reescaled_width]
+        max_pixel_reescaled = [reescaled_height, reescaled_width]
 
         'Depth crop with square'
         vetx = [-(width/2), (width/2), (width/2), -(width/2), -(width/2)]
         vety = [10, 10, -10, -10, 10]
         
-        X = [ int((vetx[i] * np.cos(ang) - vety[i] * np.sin(ang)) + max_pixel_detected[0]) for i in range(len(vetx))]
-        Y = [ int((vety[i] * np.cos(ang) + vetx[i] * np.sin(ang)) + max_pixel_detected[1]) for i in range(len(vetx))]
-        rr1, cc1 = circle(max_pixel_detected[0], max_pixel_detected[1], 5)
+        X = [ int((vetx[i] * np.cos(ang) - vety[i] * np.sin(ang)) + max_pixel[0]) for i in range(len(vetx))]
+        Y = [ int((vety[i] * np.cos(ang) + vetx[i] * np.sin(ang)) + max_pixel[1]) for i in range(len(vetx))]
+        rr1, cc1 = circle(max_pixel[0], max_pixel[1], 5)
         depth_crop_copy = depth_crop.copy()
         depth_crop_copy[rr1, cc1] = 0.2
         cv2.line(depth_crop_copy, (Y[0],X[0]), (Y[1],X[1]), (0, 0, 0), 2)
         cv2.line(depth_crop_copy, (Y[1],X[1]), (Y[2],X[2]), (0.2, 0.2, 0.2), 2)
         cv2.line(depth_crop_copy, (Y[2],X[2]), (Y[3],X[3]), (0, 0, 0), 2)
         cv2.line(depth_crop_copy, (Y[3],X[3]), (Y[4],X[4]), (0.2, 0.2, 0.2), 2)
-        cv2.imshow('image',depth_crop_copy)
+        
         depth_with_square.publish(bridge.cv2_to_imgmsg(depth_crop_copy))
         'Depth crop with square'
 
@@ -275,10 +275,10 @@ def depth_callback(depth_message):
         # Offset is used to sync the object position and cam feedback
         # offset_mm = 100 if args.real else 45
         # rr, cc = circle(max_pixel[0], max_pixel[1], 15)
-        point_depth = depth_test_circle[max_pixel[0], max_pixel[1]]
-        # depth_test_circle[rr, cc] = 0
-        # depth_test_circle = bridge.cv2_to_imgmsg(depth_test_circle)
-        # depth_test.publish(depth_test_circle)
+        point_depth = depth_copy_for_point_depth[max_pixel_reescaled[0], max_pixel_reescaled[1]]
+        # depth_copy_for_point_depth[rr, cc] = 0
+        # depth_copy_for_point_depth = bridge.cv2_to_imgmsg(depth_copy_for_point_depth)
+        # depth_test.publish(depth_copy_for_point_depth)
         'Max pixel test topic'
 
         ang = ang + np.pi/2
@@ -288,12 +288,12 @@ def depth_callback(depth_message):
                     
         # Get the grip width in meters
         width_m = width_out / crop_size_width * 2.0 * point_depth * np.tan(FOV * crop_size_width / height_res / 2.0 / 180.0 * np.pi) / 1000 #* 0.37
-        width_m = abs(width_m[max_pixel_detected[0], max_pixel_detected[1]])
+        width_m = abs(width_m[max_pixel[0], max_pixel[1]])
         # print("Width_m: ", width_m)
         
         # These magic numbers are my camera intrinsic parameters.
-        x = (max_pixel[1] - cx)/(fx) * point_depth
-        y = (max_pixel[0] - cy)/(fy) * point_depth
+        x = (max_pixel_reescaled[1] - cx)/(fx) * point_depth
+        y = (max_pixel_reescaled[0] - cy)/(fy) * point_depth
         z = point_depth
         print("Point_depth: ", z)
 

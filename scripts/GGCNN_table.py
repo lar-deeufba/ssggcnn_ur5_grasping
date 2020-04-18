@@ -105,6 +105,7 @@ class vel_control(object):
 		self.ori = []
 		self.grasp_cartesian_pose = []
 		self.gripper_angle_grasp = 0.0
+		self.final_orientation = 0.0
 		rospy.Subscriber('ggcnn/out/command', Float32MultiArray, self.ggcnn_command, queue_size=10)
 
 		# Standard attributes used to send joint position commands
@@ -188,9 +189,10 @@ class vel_control(object):
 		self.d = list(msg.data)
 		# posCB is the position of the object frame related to the base_link
 		self.posCB, _ = self.tf.lookupTransform("base_link", "object_link", rospy.Time())
-		_, oriObjCam = self.tf.lookupTransform("camera_depth_optical_frame", "object_detected", rospy.Time())
-		self.ori = euler_from_quaternion(oriObjCam)
-
+		# _, oriObjCam = self.tf.lookupTransform("camera_depth_optical_frame", "object_detected", rospy.Time())
+		# self.ori = euler_from_quaternion(oriObjCam)
+		self.ori = self.d[3]
+		
 	def get_link_position_picking(self):
 		link_name = self.string
 		model_coordinates = self.model_coordinates(self.string, 'wrist_3_link')
@@ -247,16 +249,17 @@ class vel_control(object):
 		vp - Velocity points
 		"""
 		
-		if grasp_step == 'grasp':
-			self.grasp_cartesian_pose[-1] -= 0.1
-			joint_pos = self.get_ik(self.grasp_cartesian_pose)
-			joint_pos[-1] = self.ori[-1]
-		elif grasp_step == 'pregrasp':
+		if grasp_step == 'pregrasp':
 			self.grasp_cartesian_pose = deepcopy(self.posCB)
 			self.grasp_cartesian_pose[-1] += 0.1
 			joint_pos = self.get_ik(self.grasp_cartesian_pose)
-			joint_pos[-1] = self.ori[-1]
+			joint_pos[-1] = self.ori
+			self.final_orientation = deepcopy(self.ori)
 			self.gripper_angle_grasp = deepcopy(self.d[-2])
+		elif grasp_step == 'grasp':
+			self.grasp_cartesian_pose[-1] -= 0.1
+			joint_pos = self.get_ik(self.grasp_cartesian_pose)
+			joint_pos[-1] = self.final_orientation
 		elif grasp_step == 'move':
 			joint_pos = self.get_ik(cart_pos)
 			joint_pos[-1] = 0.0
@@ -492,14 +495,14 @@ def main():
 	# Turn position controller ON
 	ur5_vel = vel_control(arg)
 	ur5_vel.turn_position_controller_on()
-	point_init = [-0.4, 0.0, 0.15] # [-0.35, 0.03, 0.05] - behind box - #[-0.40, 0.0, 0.15] - up
+	point_init = [-0.40, 0.0, 0.15] # [-0.35, 0.03, 0.05] - behind box - #[-0.40, 0.0, 0.15] - up
 	joint_values_home = ur5_vel.get_ik(point_init)
 	ur5_vel.joint_values_home = joint_values_home
 
 	# Send the robot to the custom HOME position
 	raw_input("==== Press enter to 'home' the robot!")
 	rospy.on_shutdown(ur5_vel.home_pos)
-	ur5_vel.traj_planner([-0.35, 0.03, 0.05])
+	ur5_vel.traj_planner(point_init)
 	# ur5_vel.set_pos_robot(joint_values_home)
 	
 	raw_input("==== Press enter to init to gripper!")
@@ -525,7 +528,7 @@ def main():
 		# ur5_vel.traj_planner([-0.35, 0.05, 0.05])
 
 		raw_input("==== Press enter to move to the pre grasp position!")
-		ur5_vel.traj_planner([], 'pregrasp')
+		ur5_vel.traj_planner(point_init, 'pregrasp')
 
 		# !!! GGCNN is not yet implemented to pick a object in the printer (makerbot)
 		#It closes the gripper before approaching the object
