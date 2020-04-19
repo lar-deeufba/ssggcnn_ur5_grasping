@@ -17,12 +17,19 @@ find_package(OpenCV REQUIRED)
 
 #find_package(gazebo REQUIRED)
 
+## Generate services in the 'srv' folder
+#add_service_files(
+#  FILES
+#)
+
+generate_messages(
+  DEPENDENCIES
+  std_msgs
+  sensor_msgs
+)
+
 catkin_package(CATKIN_DEPENDS message_runtime)
 
-add_service_files(
-  FILES
-  GetImage.srv
-)
 
 ###########
 ## Build ##
