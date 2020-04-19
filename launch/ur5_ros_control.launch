@@ -27,7 +27,7 @@
   #######################################
   # Load Camera
   ########################################
-  <!-- <include file="$(find real-time-grasp)/launch/rs_d435_camera.launch"/> -->
+  <!-- <include file="$(find real_time_grasp)/launch/rs_d435_camera.launch"/> -->
 
   <!-- Load hardware interface -->
   <node name="ur_hardware_interface" pkg="ur_modern_driver" type="ur_driver" output="log" launch-prefix="$(arg launch_prefix)">
@@ -49,7 +49,7 @@
   # Load UR5 Controllers
   ########################################
   <!-- Load UR5 URDF -->
-  <param name="robot_description" command="$(find xacro)/xacro --inorder '$(find real-time-grasp)/urdf/ur5_with_cam.urdf.xacro'" />
+  <param name="robot_description" command="$(find xacro)/xacro --inorder '$(find real_time_grasp)/urdf/ur5_with_cam.urdf.xacro'" />
 
   <!-- Load controller settings -->
   <rosparam file="$(find ur_modern_driver)/config/ur5_controllers.yaml" command="load"/>
@@ -72,7 +72,7 @@
   # Load Gripper Controllers
   ########################################
   <!-- Load Robotiq Gripper Controller -->
-  <rosparam file="$(find real-time-grasp)/controller/ur5gripper_controllers.yaml"
+  <rosparam file="$(find real_time_grasp)/controller/ur5gripper_controllers.yaml"
             command="load"/>
 
   <!-- <node name="gripper_controller_spawner"
@@ -84,11 +84,11 @@
   # Load Param
   ########################################
   <!-- Load joint names into the parameter server -->
-  <rosparam file="$(find real-time-grasp)/config/joint_names.yaml" command="load" />
+  <rosparam file="$(find real_time_grasp)/config/joint_names.yaml" command="load" />
   
   <!-- Launch GGCNN parameters -->
   <group ns="GGCNN">
-    <rosparam file="$(find real-time-grasp)/config/ggcnn_param.yaml" />
+    <rosparam file="$(find real_time_grasp)/config/ggcnn_param.yaml" />
   </group>
 
 </launch>

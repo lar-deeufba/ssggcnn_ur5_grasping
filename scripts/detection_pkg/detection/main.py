@@ -150,7 +150,7 @@ class Detector:
 rospy.init_node('talker', anonymous=True)
 cam=Kinect()
 rospack=rospkg.RosPack()
-path=rospack.get_path("real-time-grasp")
+path=rospack.get_path("real_time_grasp")
 det=Detector(path + "/scripts/detection_pkg/model.params")
 pub1 = rospy.Publisher('point1', Point, queue_size=10)
 pub2 = rospy.Publisher('point2', Point, queue_size=10)

@@ -34,7 +34,7 @@ bridge = CvBridge()
 
 # Load the Network.
 rospack = rospkg.RosPack()
-Home = rospack.get_path('real-time-grasp')
+Home = rospack.get_path('real_time_grasp')
 MODEL_FILE = Home + '/data/epoch_29_model.hdf5'
 with tf.device('/device:GPU:0'):
     model = load_model(MODEL_FILE)

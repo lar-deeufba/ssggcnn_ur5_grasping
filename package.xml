@@ -1,6 +1,6 @@
 <?xml version="1.0"?>
 <package format="2">
-  <name>real-time-grasp</name>
+  <name>real_time_grasp</name>
   <version>1.0.0</version>
   <description>Pkg dedicated to a grasp project using an improved version of CNN based on GGCNN</description>
 
@@ -9,7 +9,7 @@
 
   <license>BSD</license>
 
-  <url type="website">https://github.com/lar-deeufba/real-time-grasp</url>
+  <url type="website">https://github.com/lar-deeufba/real_time_grasp</url>
 
   <buildtool_depend>catkin</buildtool_depend>
   <build_depend>robot_state_publisher</build_depend>

@@ -19,18 +19,18 @@
   <arg name="publish_monitored_planning_scene" default="true"/>
   
   <arg unless="$(arg config)" name="command_args" value=""/>
-  <arg if="$(arg config)" name="command_args" value="-d $(find real-time-grasp)/launch/moveit.rviz"/>
+  <arg if="$(arg config)" name="command_args" value="-d $(find real_time_grasp)/launch/moveit.rviz"/>
 
   <!-- Load UR5 URDF / if the table is loaded, the high should be set to 0.84-->
   <!-- <param name="robot_description"
-         command="$(find xacro)/xacro inorder '$(find real-time-grasp)/urdf/ur5_with_cam.urdf.xacro'
+         command="$(find xacro)/xacro inorder '$(find real_time_grasp)/urdf/ur5_with_cam.urdf.xacro'
                   robot_pose:=0.0
                   load_table:=false"/> -->
   <!-- Load UR5 URDF -->
-  <param name="robot_description" command="$(find xacro)/xacro --inorder '$(find real-time-grasp)/urdf/ur5_with_cam.urdf.xacro'" />
+  <param name="robot_description" command="$(find xacro)/xacro --inorder '$(find real_time_grasp)/urdf/ur5_with_cam.urdf.xacro'" />
 
   <!-- The semantic description that corresponds to the URDF -->
-  <param name="$(arg robot_description)_semantic" textfile="$(find real-time-grasp)/config/ur5.srdf"/>
+  <param name="$(arg robot_description)_semantic" textfile="$(find real_time_grasp)/config/ur5.srdf"/>
 
   <!-- from moveit_rviz.launch -->
   <node name="$(anon rviz)" launch-prefix="$(arg launch_prefix)" pkg="rviz" type="rviz" respawn="false" args="$(arg command_args)" output="screen">

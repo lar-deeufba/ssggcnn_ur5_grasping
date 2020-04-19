@@ -54,7 +54,7 @@ def main():
     rospy.wait_for_service("gazebo/spawn_sdf_model")
     model_coordinates = rospy.ServiceProxy('/gazebo/get_model_state', GetModelState)
     
-    Home = rospack.get_path('real-time-grasp')
+    Home = rospack.get_path('real_time_grasp')
 
     path_table = Home + '/models/table/model.sdf'
     path_box = Home + '/models/box/model.sdf'

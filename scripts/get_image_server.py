@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 
-from real-time-grasp.srv import GetImage, GetImageResponse
+from real_time_grasp.srv import GetImage, GetImageResponse
 import rospy
 from sensor_msgs.msg import Image
 

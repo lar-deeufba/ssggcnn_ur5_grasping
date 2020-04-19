@@ -1,6 +1,6 @@
 <?xml version="1.0"?>
 <launch>
-  <arg name="world_name" default="$(find real-time-grasp)/worlds/empty.world" doc="Default world"/>
+  <arg name="world_name" default="$(find real_time_grasp)/worlds/empty.world" doc="Default world"/>
   <arg name="paused" default="true" doc="Starts gazebo in paused mode" />
   <arg name="gui" default="true" doc="Starts gazebo gui" />
   <arg name="bico" default="false" doc="Spawn bico dosador on printer" />
@@ -10,7 +10,7 @@
   ########################################
   # Load UR5 URDF
   ########################################
-  <param name="robot_description" command="$(find xacro)/xacro --inorder '$(find real-time-grasp)/urdf/ur5_with_cam.urdf.xacro'" />
+  <param name="robot_description" command="$(find xacro)/xacro --inorder '$(find real_time_grasp)/urdf/ur5_with_cam.urdf.xacro'" />
 
   ########################################
   # Load Robot Description - GAZEBO
@@ -24,15 +24,15 @@
   </include>
 
   <group if="$(eval arg('bico') == 1)">
-    <node pkg="real-time-grasp" type="spawn_model_bico_dosador.py" name="spawn_gazebo_models"/>
+    <node pkg="real_time_grasp" type="spawn_model_bico_dosador.py" name="spawn_gazebo_models"/>
   </group>
 
   <group if="$(eval arg('objects_table') ==1)">
-    <node pkg="real-time-grasp" type="spawn_objects_table.py" name="spawn_gazebo_models"/>
+    <node pkg="real_time_grasp" type="spawn_objects_table.py" name="spawn_gazebo_models"/>
   </group>
 
   <group if="$(eval arg('objects_bin') ==1)">
-    <node pkg="real-time-grasp" type="spawn_objects_bin.py" name="spawn_gazebo_models"/>
+    <node pkg="real_time_grasp" type="spawn_objects_bin.py" name="spawn_gazebo_models"/>
   </group>
 
   <!-- push robot_description to factory and spawn robot in gazebo x = 1.90 y = -2.40, z = 0.875-->
@@ -54,15 +54,15 @@
   # Load Parameters
   ########################################
   <!-- Load joint names into the parameter server -->
-  <rosparam file="$(find real-time-grasp)/config/joint_names.yaml" command="load" />
+  <rosparam file="$(find real_time_grasp)/config/joint_names.yaml" command="load" />
   
   <!-- Launch GGCNN parameters -->
   <group ns="GGCNN">
-    <rosparam file="$(find real-time-grasp)/config/ggcnn_param.yaml" />
+    <rosparam file="$(find real_time_grasp)/config/ggcnn_param.yaml" />
   </group>
 
   <group ns="SSD512">
-    <rosparam file="$(find real-time-grasp)/config/ssd_param.yaml" />
+    <rosparam file="$(find real_time_grasp)/config/ssd_param.yaml" />
   </group>
 
 
@@ -70,7 +70,7 @@
   # Load Gripper Controllers
   ########################################
   <!-- Load Robotiq Gripper Controller -->
-  <rosparam file="$(find real-time-grasp)/controller/ur5gripper_controllers.yaml"
+  <rosparam file="$(find real_time_grasp)/controller/ur5gripper_controllers.yaml"
             command="load"/>
 
   <node name="gripper_controller_spawner"
@@ -83,7 +83,7 @@
   # Load UR5 Controllers
   # load velocity and position controllers
   ########################################
-  <rosparam file="$(find real-time-grasp)/controller/ur5_controllers.yaml"
+  <rosparam file="$(find real_time_grasp)/controller/ur5_controllers.yaml"
             command="load"/>
 
   <include file="$(find ur_gazebo)/launch/controller_utils.launch"/>
