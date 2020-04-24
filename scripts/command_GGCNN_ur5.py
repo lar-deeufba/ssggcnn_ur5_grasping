@@ -86,14 +86,14 @@ class vel_control(object):
             self.pub_model = rospy.Publisher('/gazebo/set_link_state', LinkState, queue_size=1)
             self.model = rospy.wait_for_message('gazebo/model_states', ModelStates)
             self.model_coordinates = rospy.ServiceProxy( '/gazebo/get_link_state', GetLinkState)
-            self.wrench = rospy.Subscriber('/ft_sensor/raw', WrenchStamped, self.monitor_wrench, queue_size=1)
+            self.wrench = rospy.Subscriber('/ft_sensor/raw', WrenchStamped, self.monitor_wrench_callback, queue_size=1)
             # self.model_contacts = rospy.Subscriber('/gazebo/default/physics/contacts', ContactState, self.monitor_contacts, queue_size=10)
 
         # GGCNN
         self.joint_values_ggcnn = []
         self.posCB = []
         self.ori = []
-        self.cmd_pub = rospy.Subscriber('ggcnn/out/command', Float32MultiArray, self.ggcnn_command, queue_size=10)
+        self.cmd_pub = rospy.Subscriber('ggcnn/out/command', Float32MultiArray, self.ggcnn_command_callback, queue_size=10)
 
         # Standard attributes used to send joint position commands
         self.joint_vels = Float64MultiArray()
@@ -211,7 +211,18 @@ class vel_control(object):
     """
     GGCNN Command Subscriber Callback
     """
-    def ggcnn_command(self, msg):
+    def ggcnn_command_callback(self, msg):
+        self.transf.waitForTransform("object_detected", "base_link", rospy.Time.now(), rospy.Duration(4.0))
+        object_pose, object_ori = self.transf.lookupTransform("base_link", "object_detected", rospy.Time.now())
+        object_ori = euler_from_quaternion(object_ori)
+        self.br.sendTransform((object_pose[0] + offset_x, 
+                               object_pose[1] + offset_y,
+                               object_pose[2] + offset_z), 
+                               quaternion_from_euler(0.0, 0.0, object_ori[2]),
+                               rospy.Time.now(),
+                               "object_link",
+                               "base_link")
+
         # msg = rospy.wait_for_message('/ggcnn/out/command', Float32MultiArray)
         self.tf.waitForTransform("object_link", "base_link", rospy.Time(), rospy.Duration(4.0))
         self.tf.waitForTransform("camera_depth_optical_frame", "object_detected", rospy.Time(), rospy.Duration(4.0))
@@ -290,7 +301,7 @@ class vel_control(object):
     """
     This method monitor the force applied to the gripper
     """       
-    def monitor_wrench(self, msg):
+    def monitor_wrench_callback(self, msg):
         global MOVE_GRIPPER, STARTED_GRIPPER, CONTACT, GRASPING
 
         # print(msg)

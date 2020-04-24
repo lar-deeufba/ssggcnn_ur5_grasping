@@ -31,6 +31,11 @@ from trac_ik_python.trac_ik import IK
 # import roslib; roslib.load_manifest('robotiq_2f_gripper_control')
 from robotiq_2f_gripper_control.msg import _Robotiq2FGripper_robot_output  as outputMsg
 
+import cv2
+import matplotlib.pyplot as plt 
+from cv_bridge import CvBridge
+# -----------
+
 CLOSE_GRIPPER_VEL = 0.05
 OPEN_GRIPPER_VEL = -0.1
 STOP_GRIPPER_VEL = 0.0
@@ -62,6 +67,7 @@ class vel_control(object):
 
 		# Used to perform TF transformations
 		self.tf = TransformListener()
+		self.br = TransformBroadcaster()
 
 		# Used to change the controller
 		self.controller_switch = rospy.ServiceProxy('/controller_manager/switch_controller', SwitchController)
@@ -81,21 +87,21 @@ class vel_control(object):
 			# For picking
 			self.pub_model_position = rospy.Publisher('/gazebo/set_link_state', LinkState, queue_size=10)
 			self.model_coordinates = rospy.ServiceProxy( '/gazebo/get_link_state', GetLinkState)
-			rospy.Subscriber('gazebo/model_states', ModelStates, self.get_model_state_subscriber, queue_size=10)
+			rospy.Subscriber('gazebo/model_states', ModelStates, self.get_model_state_callback, queue_size=10)
 
 			# Subscriber used to read joint values
-			rospy.Subscriber('/joint_states', JointState, self.ur5_actual_position, queue_size=2)
+			rospy.Subscriber('/joint_states', JointState, self.ur5_actual_position_callback, queue_size=2)
 			rospy.sleep(1.0)
 			
 			# USED FOR COLLISION DETECTION
 			self.finger_links = ['robotiq_85_right_finger_tip_link', 'robotiq_85_left_finger_tip_link']
 			# LEFT GRIPPER
 			self.string = ""
-			rospy.Subscriber('/left_finger_bumper_vals', ContactsState, self.monitor_contacts_left_finger) # ContactState
+			rospy.Subscriber('/left_finger_bumper_vals', ContactsState, self.monitor_contacts_left_finger_callback) # ContactState
 			self.left_collision = False
 			self.contactState_left = ContactState()
 			# RIGHT GRIPPER
-			rospy.Subscriber('/right_finger_bumper_vals', ContactsState, self.monitor_contacts_right_finger) # ContactState
+			rospy.Subscriber('/right_finger_bumper_vals', ContactsState, self.monitor_contacts_right_finger_callback) # ContactState
 			self.right_collision = False
 			self.contactState_right = ContactState()
 			
@@ -106,8 +112,17 @@ class vel_control(object):
 		self.grasp_cartesian_pose = []
 		self.gripper_angle_grasp = 0.0
 		self.final_orientation = 0.0
-		rospy.Subscriber('ggcnn/out/command', Float32MultiArray, self.ggcnn_command, queue_size=10)
+		if self.args.gazebo:
+			self.offset_x = 0.005
+			self.offset_y = 0.0
+			self.offset_z = 0.02
+		else:
+			self.offset_x = -0.03 # 0.002
+			self.offset_y = 0.02 # -0.05
+			self.offset_z = 0.058 # 0.013
 
+		rospy.Subscriber('ggcnn/out/command', Float32MultiArray, self.ggcnn_command_callback, queue_size=1)
+				
 		# Standard attributes used to send joint position commands
 		self.joint_vels = Float64MultiArray()
 		self.goal = FollowJointTrajectoryGoal()
@@ -132,7 +147,7 @@ class vel_control(object):
 	def turn_position_controller_on(self):
 		self.controller_switch('pos_based_pos_traj_controller', 'joint_group_vel_controller', 1)
 
-	def monitor_contacts_left_finger(self, msg):
+	def monitor_contacts_left_finger_callback(self, msg):
 		if msg.states:
 			# print(msg)
 			self.left_collision = True
@@ -145,7 +160,7 @@ class vel_control(object):
 		else:
 			self.left_collision = False
 
-	def monitor_contacts_right_finger(self, msg):
+	def monitor_contacts_right_finger_callback(self, msg):
 		if msg.states:
 			self.right_collision = True
 			string = msg.states[0].collision1_name
@@ -164,7 +179,7 @@ class vel_control(object):
 	But the correct order of the joints that must be sent to the robot is:
 	['shoulder_pan_joint', 'shoulder_lift_joint', 'elbow_joint', 'wrist_1_joint', 'wrist_2_joint', 'wrist_3_joint']
 	"""
-	def ur5_actual_position(self, joint_values_from_ur5):
+	def ur5_actual_position_callback(self, joint_values_from_ur5):
 		if self.args.gazebo:
 			self.th3, self.robotic, self.th2, self.th1, self.th4, self.th5, self.th6 = joint_values_from_ur5.position
 			# print("Robotic angle: ", self.robotic)
@@ -173,32 +188,35 @@ class vel_control(object):
 		
 		self.actual_position = [self.th1, self.th2, self.th3, self.th4, self.th5, self.th6]
 
-		# max_distance = 0.085
-		# angular_coeff = 0.11
-		# K = 1.5
-		# angle = (max_distance - self.d[-2]) / angular_coeff * K
-		# print(angle)
-
 	"""
 	GGCNN Command Subscriber Callback
 	"""
-	def ggcnn_command(self, msg):
-		# msg = rospy.wait_for_message('/ggcnn/out/command', Float32MultiArray)
-		self.tf.waitForTransform("object_link", "base_link", rospy.Time(), rospy.Duration(4.0))
-		self.tf.waitForTransform("camera_depth_optical_frame", "object_detected", rospy.Time(), rospy.Duration(4.0))
+	def ggcnn_command_callback(self, msg):
+		# self.tf.waitForTransform("base_link", "object_detected", rospy.Time.now(), rospy.Duration(4.0))
+		object_pose, object_ori = self.tf.lookupTransform("base_link", "object_detected", rospy.Time(0))
 		self.d = list(msg.data)
-		# posCB is the position of the object frame related to the base_link
-		self.posCB, _ = self.tf.lookupTransform("base_link", "object_link", rospy.Time())
-		# _, oriObjCam = self.tf.lookupTransform("camera_depth_optical_frame", "object_detected", rospy.Time())
-		# self.ori = euler_from_quaternion(oriObjCam)
+
+		object_pose[0] += self.offset_x
+		object_pose[1] += self.offset_y
+		object_pose[2] += self.offset_z
+		
+		self.posCB = object_pose
 		self.ori = self.d[3]
+
+		self.br.sendTransform((object_pose[0], 
+                               object_pose[1],
+                               object_pose[2]), 
+                               quaternion_from_euler(0.0, 0.0, self.ori),
+                               rospy.Time.now(),
+                               "object_link",
+                               "base_link")
 		
 	def get_link_position_picking(self):
 		link_name = self.string
 		model_coordinates = self.model_coordinates(self.string, 'wrist_3_link')
 		self.model_pose_picking = model_coordinates.link_state.pose
 
-	def get_model_state_subscriber(self, msg):
+	def get_model_state_callback(self, msg):
 		self.object_picking()
 
 	def object_picking(self):
@@ -220,20 +238,19 @@ class vel_control(object):
 		Arguments:
 			pose {list} -- A pose representing x, y and z
 
-		Keyword Arguments:
-			ori {str} -- Define the final orientation of the robot (default: {'pick'})
-		
 		Returns:
-			{list} -- Joint angles or None if track_ik is not able to find a valid solution
+			sol {list} -- Joint angles or None if track_ik is not able to find a valid solution
 		"""
-		grasping_link_offset = 0.15
+		camera_support_angle_offset = 0.25
+		# camera_support_angle_offset = 0.0
 		
-		q = quaternion_from_euler(0.0, -3.14, 0.0)
+		q = quaternion_from_euler(0.0, -3.14 + camera_support_angle_offset, 0.0)
 		# Joint order:
 		# ('shoulder_link', 'upper_arm_link', 'forearm_link', 'wrist_1_link', 'wrist_2_link', 'wrist_3_link', 'tool0')            
-		ik_solver = IK("base_link", "tool0", solve_type="Distance")
+		ik_solver = IK("base_link", "grasping_link", solve_type="Distance")
 		sol = ik_solver.get_ik([0.2201039360819781, -1.573845095552878, -1.521853400505349, -1.6151347051274518, 1.5704492904506875, 0.0], 
-				pose[0], pose[1], pose[2] + grasping_link_offset, q[0], q[1], q[2], q[3])
+				pose[0], pose[1], pose[2], q[0], q[1], q[2], q[3], 0.02, 0.02, 0.02,  # X, Y, Z bounds
+                0.1, 0.1, 0.1)
 		if sol is not None:
 			sol = list(sol)
 			sol[-1] = 0.0
@@ -250,6 +267,7 @@ class vel_control(object):
 		"""
 		
 		if grasp_step == 'pregrasp':
+			print("POSCB: ", self.posCB)
 			self.grasp_cartesian_pose = deepcopy(self.posCB)
 			self.grasp_cartesian_pose[-1] += 0.1
 			joint_pos = self.get_ik(self.grasp_cartesian_pose)
@@ -364,7 +382,7 @@ class vel_control(object):
 		global CLOSE_GRIPPER_VEL, OPEN_GRIPPER_VEL
 		global MIN_GRIPPER_OPEN_INIT, MAX_GRIPPER_CLOSE_INIT
 
-		rate = rospy.Rate(40)
+		rate = rospy.Rate(5)
 		joint_vels_gripper = Float64MultiArray()
 		if self.robotic < MIN_GRIPPER_OPEN_INIT:
 			joint_vels_gripper.data = np.array([CLOSE_GRIPPER_VEL])
@@ -494,8 +512,9 @@ def main():
 
 	# Turn position controller ON
 	ur5_vel = vel_control(arg)
+
 	ur5_vel.turn_position_controller_on()
-	point_init = [-0.40, 0.0, 0.15] # [-0.35, 0.03, 0.05] - behind box - #[-0.40, 0.0, 0.15] - up
+	point_init = [-0.35, 0.1, 0.15] # [-0.35, 0.03, 0.05] - behind box - #[-0.40, 0.0, 0.15] - up
 	joint_values_home = ur5_vel.get_ik(point_init)
 	ur5_vel.joint_values_home = joint_values_home
 
@@ -506,9 +525,10 @@ def main():
 	# ur5_vel.set_pos_robot(joint_values_home)
 	
 	raw_input("==== Press enter to init to gripper!")
+	PICKING = False
 	if arg.gazebo:
 		rospy.loginfo("Starting the gripper in Gazebo! Please wait...")
-		ur5_vel.gripper_init()
+		ur5_vel.gripper_vel_control('open')
 		rospy.loginfo("Gripper started!")   
 	else:
 		rospy.loginfo("Starting the real gripper! Please wait...")
