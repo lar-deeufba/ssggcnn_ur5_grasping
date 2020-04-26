@@ -45,7 +45,7 @@ def parse_args():
     parser = argparse.ArgumentParser(description='GGCN and SSD grasping')
     parser.add_argument('--real', action='store_true', help='Consider the real intel realsense')
     parser.add_argument('--plot', action='store_true', help='Plot depth image')
-    parser.add_argument('--ssgnn', action='store_true', help='Plot depth image')
+    parser.add_argument('--ssggcnn', action='store_true', help='Plot depth image')
     args = parser.parse_args()
     return args
 
@@ -82,6 +82,7 @@ class ssgg_grasping(object):
         self.depth_pub = rospy.Publisher('ggcnn/img/depth', Image, queue_size=1)
         self.cos = rospy.Publisher('ggcnn/img/cos', Image, queue_size=1)
         self.sin = rospy.Publisher('ggcnn/img/sin', Image, queue_size=1)
+        self.width_pub = rospy.Publisher('ggcnn/img/width', Image, queue_size=1)
         self.depth_pub_ssd_square = rospy.Publisher('ggcnn/img/depth_ssd_square', Image, queue_size=1)
         self.depth_pub_copied_img = rospy.Publisher('ggcnn/img/depth_shot_with_copied_img', Image, queue_size=1)
         self.depth_pub_shot = rospy.Publisher('ggcnn/img/depth_shot', Image, queue_size=1)
@@ -119,8 +120,9 @@ class ssgg_grasping(object):
         self.depth_image_shot_with_object_copied = None
         self.sin_img = None
         self.cos_img = None
+        self.width_img = None
 
-        self.depth_offset_px = 10
+        self.depth_offset_px = 0
 
         # Initialise some globals.
         self.max_pixel = np.array([150, 150])
@@ -180,10 +182,8 @@ class ssgg_grasping(object):
     def image_callback(self, color_msg):
         color_img = self.bridge.imgmsg_to_cv2(color_msg)
         height_res, width_res, _ = color_img.shape
-        offset_height = 0# -12
-        offset_width = 0# 12
-        color_img = color_img[0 + offset_height: self.crop_size + offset_height, 
-                    (width_res - self.crop_size)//2 + offset_width : (width_res - self.crop_size)//2 + self.crop_size + offset_width]
+        color_img = color_img[0 : self.crop_size, 
+                    (width_res - self.crop_size)//2 : (width_res - self.crop_size)//2 + self.crop_size]
         self.color_img = color_img
 
     def get_depth_image_shot(self):
@@ -223,7 +223,7 @@ class ssgg_grasping(object):
 
     # vai ter que se inscrever na copia da imagem (shot + square)
     def depth_process_ggcnn(self):
-        if self.args.ssgnn:
+        if self.args.ssggcnn:
             depth_message = self.depth_image_shot_with_object_copied
         else:
             depth_message = self.depth_message
@@ -279,21 +279,21 @@ class ssgg_grasping(object):
 
         # FILTERING PROCESS
         # The filters are applied to augment the chances of getting a good grasp pose
-        points_out = ndimage.filters.gaussian_filter(points_out, 5.0)
-        points_out = np.clip(points_out, 0.0, 1.0-1e-3)
-        ang_out = ndimage.filters.gaussian_filter(ang_out, 2.0)
-        width_out = ndimage.filters.gaussian_filter(width_out, 1.0)
+        points_out_filtered = ndimage.filters.gaussian_filter(points_out, 5.0)
+        points_out_filtered = np.clip(points_out_filtered, 0.0, 1.0-1e-3)
+        ang_out_filtered = ndimage.filters.gaussian_filter(ang_out, 2.0)
+        width_out_filtered = ndimage.filters.gaussian_filter(width_out, 1.0)
 
         # CONTROL PROCESS
         link_pose, _ = self.transf.lookupTransform("base_link", "grasping_link", rospy.Time(0))
         ROBOT_Z = link_pose[2]
         # Track the global max.
-        # max_pixel correponds to the position of the max value in points_out
-        max_pixel = np.array(np.unravel_index(np.argmax(points_out), points_out.shape))
+        # max_pixel correponds to the position of the max value in points_out_filtered
+        max_pixel = np.array(np.unravel_index(np.argmax(points_out_filtered), points_out_filtered.shape))
         # Return max_pixel posiiton as an int (300x300)
         max_pixel = max_pixel.astype(np.int)
-        ang = ang_out[max_pixel[0], max_pixel[1]]
-        width_px = width_out[max_pixel[0], max_pixel[1]]
+        ang = ang_out_filtered[max_pixel[0], max_pixel[1]]
+        width_px = width_out_filtered[max_pixel[0], max_pixel[1]]
         reescaled_height = int(max_pixel[0])
         reescaled_width = int((width_res - self.crop_size) // 2 + max_pixel[1])
         max_pixel_reescaled = [reescaled_height, reescaled_width]
@@ -302,7 +302,7 @@ class ssgg_grasping(object):
         # GRASP WIDTH PROCESS
         g_width = 2.0 * (ROBOT_Z + 0.24) * np.tan(self.FOV / height_res * width_px / 2.0 / 180.0 * np.pi) #* 0.37
         crop_size_width = float(self.crop_size)
-        width_m = width_out / crop_size_width * 2.0 * point_depth * np.tan(self.FOV * crop_size_width / height_res / 2.0 / 180.0 * np.pi) / 1000 #* 0.37
+        width_m = width_out_filtered / crop_size_width * 2.0 * point_depth * np.tan(self.FOV * crop_size_width / height_res / 2.0 / 180.0 * np.pi) / 1000 #* 0.37
         width_m = abs(width_m[max_pixel[0], max_pixel[1]])
                     
         if not np.isnan(point_depth):
@@ -314,11 +314,12 @@ class ssgg_grasping(object):
         # OUTPUT
         self.cos_img = cos_out
         self.sin_img = sin_out
-        self.depth_message_ggcnn = depth_message
+        self.ang_out = ang_out
+        self.width_out = width_out
         self.points_out = points_out
+        self.depth_message_ggcnn = depth_message
         self.depth_crop = depth_crop
         self.ang = ang
-        self.ang_out = ang_out
         self.width_px = width_px
         self.max_pixel = max_pixel
         self.max_pixel_reescaled = max_pixel_reescaled
@@ -345,8 +346,8 @@ class ssgg_grasping(object):
             vetx = [-(width_px/2), (width_px/2), (width_px/2), -(width_px/2)]
             vety = [10, 10, -10, -10]
             
-            X = [ int((     vetx[i]*np.cos(rectangle_ang) + vety[i]*np.sin(rectangle_ang)) + self.max_pixel[1]) for i in range(len(vetx))]
-            Y = [ int((-1 * vetx[i]*np.sin(rectangle_ang) + vety[i]*np.cos(rectangle_ang)) + self.max_pixel[0]) for i in range(len(vetx))]
+            X = [ int((     vetx[i]*np.cos(rectangle_ang) + vety[i]*np.sin(rectangle_ang)) + max_pixel[1]) for i in range(len(vetx))]
+            Y = [ int((-1 * vetx[i]*np.sin(rectangle_ang) + vety[i]*np.cos(rectangle_ang)) + max_pixel[0]) for i in range(len(vetx))]
      
             rr1, cc1 = circle(max_pixel[0], max_pixel[1], 5)
             depth_crop_copy = depth_crop.copy()
@@ -357,6 +358,11 @@ class ssgg_grasping(object):
             cv2.line(depth_crop_copy, (X[3],Y[3]), (X[0],Y[0]), (0.2, 0.2, 0.2), 2)
             self.depth_with_square.publish(self.bridge.cv2_to_imgmsg(depth_crop_copy))#, encoding="rgb8"))
 
+            max_pixel = [max_pixel[0], max_pixel[1] - 7]
+            X = [ int((     vetx[i]*np.cos(rectangle_ang) + vety[i]*np.sin(rectangle_ang)) + max_pixel[1]) for i in range(len(vetx))]
+            Y = [ int((-1 * vetx[i]*np.sin(rectangle_ang) + vety[i]*np.cos(rectangle_ang)) + max_pixel[0]) for i in range(len(vetx))]
+     
+            rr1, cc1 = circle(max_pixel[0], max_pixel[1], 5)
             img_crop_copy = color_img.copy()
             img_crop_copy[rr1, cc1] = 0.2
             cv2.line(img_crop_copy, (X[0],Y[0]), (X[1],Y[1]), (0, 0, 0), 2)
@@ -395,22 +401,23 @@ class ssgg_grasping(object):
         depth_crop = self.depth_crop
         cos_img = self.cos_img
         sin_img = self.sin_img
+        width_img = self.width_out
 
         print "Aqui 3"
         if grasp_img is not None:
             #Publish the output images (not used for control, only visualisation)
             grasp_img = self.bridge.cv2_to_imgmsg(grasp_img, 'bgr8')
             grasp_img.header = depth_message.header
-            
             self.grasp_pub.publish(grasp_img)
+            
             depth_crop = self.bridge.cv2_to_imgmsg(depth_crop)
             depth_crop.header = depth_message.header
-
             self.depth_pub.publish(depth_crop)
+            
             self.ang_pub.publish(self.bridge.cv2_to_imgmsg(ang_out))
-
             self.cos.publish(self.bridge.cv2_to_imgmsg(cos_img))
             self.sin.publish(self.bridge.cv2_to_imgmsg(sin_img))
+            self.width_pub.publish(self.bridge.cv2_to_imgmsg(width_img))
             
     def publish_data_to_robot(self):
         grasping_point = self.grasping_point
@@ -434,12 +441,6 @@ class ssgg_grasping(object):
         cmd_msg.data = [grasping_point[0]/1000.0, grasping_point[1]/1000.0, grasping_point[2]/1000.0, -1*ang, width_m, g_width]
         self.cmd_pub.publish(cmd_msg)
         
-        # The transformation between object_detected and base_link can be done way better with TF2
-        # self.br.sendTransform((0.0, 0.0, 0.0), quaternion_from_euler(0.0, 0.0, 0.0),
-        #                  rospy.Time.now(),
-        #                  "camera_depth_optical_frame_rotated",
-        #                  "camera_depth_optical_frame")
-
         self.br.sendTransform((cmd_msg.data[0], 
                                cmd_msg.data[1], 
                                cmd_msg.data[2]), 
@@ -448,23 +449,12 @@ class ssgg_grasping(object):
                                "object_detected",
                                "camera_depth_optical_frame")
 
-        ## print(self.transf.waitForTransform("object_detected", "base_link", rospy.Time.now(), rospy.Duration(4.0)))
-        # object_pose, object_ori = self.transf.lookupTransform("object_detected", "reference_frame", rospy.Time.now())
-        # object_ori = euler_from_quaternion(object_ori)
-        # self.br.sendTransform((object_pose[0] + offset_x, 
-        #                        object_pose[1] + offset_y,
-        #                        object_pose[2] + offset_z), 
-        #                        quaternion_from_euler(0.0, 0.0, object_ori[2]),
-        #                        rospy.Time.now(),
-        #                        "object_link",
-        #                        "reference_frame")
-
 def main():
     args = parse_args()
     grasp_detection = ssgg_grasping(args)
     rospy.sleep(3.0)
 
-    if args.ssgnn:
+    if args.ssggcnn:
         raw_input("Move the objects out of the camera view and move the robot to the pre-grasp position.")
         grasp_detection.get_depth_image_shot()
     
@@ -473,7 +463,7 @@ def main():
     while not rospy.is_shutdown():
         # rospy.spin()
         print "Running"
-        if args.ssgnn:
+        if args.ssggcnn:
             grasp_detection.copy_obj_to_depth_img()
         grasp_detection.depth_process_ggcnn()
         grasp_detection.publish_grasping_rectangle_image()

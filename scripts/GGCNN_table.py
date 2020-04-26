@@ -514,7 +514,7 @@ def main():
 	ur5_vel = vel_control(arg)
 
 	ur5_vel.turn_position_controller_on()
-	point_init = [-0.35, 0.1, 0.15] # [-0.35, 0.03, 0.05] - behind box - #[-0.40, 0.0, 0.15] - up
+	point_init = [-0.37, 0.11, 0.05] # [-0.35, 0.03, 0.05] - behind box - #[-0.40, 0.0, 0.15] - up
 	joint_values_home = ur5_vel.get_ik(point_init)
 	ur5_vel.joint_values_home = joint_values_home
 

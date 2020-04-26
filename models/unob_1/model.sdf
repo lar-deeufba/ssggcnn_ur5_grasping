@@ -1,14 +1,14 @@
 <?xml version="1.0" ?>
 <sdf version="1.5">
-  <model name="Bico_dosador">
+  <model name="unob_1">
     <static>false</static>
-    <link name="bico_dosador_link">
+    <link name="unob_1_link">
 
       <collision name="collision">
         <geometry>
           <mesh>
-            <uri>model://bico_dosador/meshes/bico_dosador.dae</uri>
-            <scale>0.8 0.8 0.8</scale>
+            <uri>model://unob_1/meshes/unob_1.dae</uri>
+            <scale>0.3 0.3 2.2</scale>
           </mesh>
         </geometry>
       </collision>
@@ -16,14 +16,14 @@
       <visual name="visual">
         <geometry>
           <mesh>
-            <uri>model://bico_dosador/meshes/bico_dosador.dae</uri>
-            <scale>0.8 0.8 0.8</scale>
+            <uri>model://unob_1/meshes/unob_1.dae</uri>
+            <scale>0.3 0.3 2.2</scale>
           </mesh>
         </geometry>
         <material>
           <script>
             <uri>file://media/materials/scripts/gazebo.material</uri>
-            <name>Gazebo/White</name>
+            <name>Gazebo/Blue</name>
           </script>
         </material>
       </visual>

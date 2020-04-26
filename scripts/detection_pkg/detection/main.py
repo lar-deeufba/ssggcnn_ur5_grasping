@@ -144,6 +144,7 @@ class Detector:
 			out_img = timg
 	
 		box_list = BboxList.from_arrays(fids, fscores, rscaled_bboxes, self.classes, th=threshold)
+
 		return box_list, timg
 
 
@@ -163,7 +164,6 @@ while not rospy.is_shutdown():
 	#im=cv2.cvtColor(im,cv2.COLOR_BGR2RGB)
 	
 	if cam.has_image > 0:
-		
 		im=cam.image
 		[caixas,timag]= det.detect(im)
 		size = len(caixas)
@@ -172,9 +172,9 @@ while not rospy.is_shutdown():
 			points_to_send_list = []
 			print("size: ", size)
 			while i < size:
-				# if caixas[i].class_name == "tray":
-				# 	i=i+1
-				# else:
+				print(caixas[i].class_name)# == "test"
+				print(caixas[i])
+				caixas[i].class_name = ""
 				img=caixas.draw(im)
 				cv2.circle(img,(int(caixas[i].x1),int(caixas[i].y1)), 2, (0,0,255), -1)
 				cv2.circle(img,(int(caixas[i].x2),int(caixas[i].y2)), 2, (0,0,255), -1)
