@@ -92,7 +92,7 @@ def main():
 
 	rospy.sleep(0.3)
 
-	# ptFinal = [-0.01, -0.6, 0.1]
+	# [-0.09, -0.42, 0.1]
 	ptFinal = [-0.14, -0.45, 0.1] # all together in the bin
 	oriFinal = quaternion_from_euler(0.0, 0.0, 0.0)
 	moving4 = Moving("bico_dosador", Spawning1, x_position + ptFinal[0], y_position + ptFinal[1], z_position + ptFinal[2], oriFinal, bico_dosador)

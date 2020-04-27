@@ -122,7 +122,8 @@ class ssgg_grasping(object):
         self.cos_img = None
         self.width_img = None
 
-        self.depth_offset_px = 0
+        self.offset_ = 10
+        self.center_calibrated_point = np.array([312, 240]) # x, y
 
         # Initialise some globals.
         self.max_pixel = np.array([150, 150])
@@ -150,6 +151,7 @@ class ssgg_grasping(object):
         
     def bounding_boxes_callback(self, msg):
         # print("msg: ", msg)
+        center_calibrated_point = self.center_calibrated_point
         box_number = len(msg.data) / 4
         if box_number != 0:
             depth = self.bridge.imgmsg_to_cv2(self.depth_message)
@@ -158,19 +160,28 @@ class ssgg_grasping(object):
             box_points = list(msg.data)
             # print(box_points)
             i, index_inf, index_sup = 0, 0, 4
-            offset = self.depth_offset_px # it is necessary because depth and color images are not always fully aligned
             points_vec = []
-            
+            offset = self.offset_
+            K = 0.2
             while i < box_number:
-                points = box_points[index_inf: index_sup]
-                points_vec.append(points)
+                points_from_box = box_points[index_inf: index_sup]
 
-                start_point = (points[0] - offset, points[1] - offset)
-                end_point = (points[2] + offset, points[3] + offset)
-                color = (255, 0, 0)
-                thickness = 2
-                actual_depth_image = cv2.rectangle(actual_depth_image, start_point, end_point, color, thickness)
+                center = ((points_from_box[0] + points_from_box[2])/2, (points_from_box[1] + points_from_box[3])/2)
+
+                dist = [int(center[0] - center_calibrated_point[0]), int(center[1] - center_calibrated_point[1])]
+
+                final_distance = [int(dist[0]*K), int(dist[1]*K)]
+
+                start_point = (points_from_box[0] + final_distance[0] - offset, points_from_box[1] + final_distance[1] - offset)
+                end_point = (points_from_box[2] + final_distance[0] + offset, points_from_box[3] + final_distance[1] + offset)
+
+                # start_point = (points_from_box[0] - offset, points_from_box[1] - offset)
+                # end_point = (points_from_box[2] + offset, points_from_box[3] + offset)
+                actual_depth_image = cv2.rectangle(actual_depth_image, start_point, end_point, (200, 0, 0), 2)
                 
+                new_points = [start_point[0], start_point[1], end_point[0], end_point[1]]
+                points_vec.append(new_points)
+
                 index_inf += 4
                 index_sup += 4
                 i += 1
@@ -188,6 +199,7 @@ class ssgg_grasping(object):
 
     def get_depth_image_shot(self):
         self.depth_image_shot = rospy.wait_for_message("camera/depth/image_raw", Image)
+        self.depth_image_shot.header = self.depth_message.header
 
         # depth_image_shot = self.depth_image_shot
         # depth = self.bridge.imgmsg_to_cv2(depth_image_shot)
@@ -206,12 +218,11 @@ class ssgg_grasping(object):
         depth_message = self.bridge.imgmsg_to_cv2(depth_message)
         depth_message_copy = depth_message.copy()
 
-        offset = self.depth_offset_px
         number_of_boxes = len(points)
         i = 0
         while i < number_of_boxes:
-            depth_image_shot_copy[points[i][1] - offset : points[i][3] + offset, points[i][0] - offset : points[i][2] + offset] \
-             = depth_message_copy[points[i][1] - offset : points[i][3] + offset, points[i][0] - offset : points[i][2] + offset] 
+            depth_image_shot_copy[points[i][1] : points[i][3], points[i][0] : points[i][2]] \
+             = depth_message_copy[points[i][1] : points[i][3], points[i][0] : points[i][2]] 
             i += 1
 
         depth_image_shot = self.bridge.cv2_to_imgmsg(depth_image_shot_copy)

@@ -156,6 +156,7 @@ det=Detector(path + "/scripts/detection_pkg/model.params")
 pub1 = rospy.Publisher('point1', Point, queue_size=10)
 pub2 = rospy.Publisher('point2', Point, queue_size=10)
 arraypub = rospy.Publisher('sdd_points_array', Int32MultiArray, queue_size=10)
+ssd_img_pub = rospy.Publisher('ssd/img/bouding_box', Image, queue_size=1)
 rospy.Subscriber("/camera/color/image_raw", Image, cam.set_image)
 rate = rospy.Rate(10) # 10hz
 points_to_send = Int32MultiArray()
@@ -170,10 +171,10 @@ while not rospy.is_shutdown():
 		if size != 0:
 			i = 0
 			points_to_send_list = []
-			print("size: ", size)
+			# print("size: ", size)
 			while i < size:
-				print(caixas[i].class_name)# == "test"
-				print(caixas[i])
+				# print(caixas[i].class_name)# == "test"
+				# print(caixas[i])
 				caixas[i].class_name = ""
 				img=caixas.draw(im)
 				cv2.circle(img,(int(caixas[i].x1),int(caixas[i].y1)), 2, (0,0,255), -1)
@@ -197,6 +198,7 @@ while not rospy.is_shutdown():
 				pub2.publish(point2)
 				# i=size
 				i+=1
+				ssd_img_pub.publish(CvBridge().cv2_to_imgmsg(img, 'bgr8'))
 			points_to_send.data = points_to_send_list # assign the array with the value you want to send
 			print(points_to_send.data)
 			arraypub.publish(points_to_send)

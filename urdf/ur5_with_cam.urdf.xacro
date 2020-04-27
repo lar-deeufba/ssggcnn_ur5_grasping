@@ -22,9 +22,7 @@
   <!-- arm -->
   <xacro:ur5_robot prefix="" joint_limited="false" transmission_hw_interface="$(arg transmission_hw_interface)"/>
 
-  <sensor_d435 parent="CAM_support_link">
-    <origin xyz="-0.0277 -0.002 -0.0075" rpy="0 0 0"/>
-  </sensor_d435>
+  
   
   <link name="world"/>
 
@@ -52,7 +50,9 @@
     <child link="reference_link"/>
   </joint>
 
-  <!-- CAM SUPPORT CODE -->
+  ########################################
+  # CAN Support code
+  ########################################
 
   <!-- o wrist 2 fica 0.09465 m abaixo de wrist 3 (-0.0445+0.09465)-->
   <!-- Its position is relative to its own (Caution: treat as inverse direction)-->
@@ -71,24 +71,28 @@
   </link>
 
   <joint name="CAM_support_joint" type="fixed">
-    <!-- Its position is relative to the previous link -->
-    <!-- Its orientation is relative to its own frame -->
     <origin rpy="0 ${0.244} 1.57" xyz="${-0.021 + 0.03 - 0.01} ${-0.027 + 0.03 + 0.015} ${0.205 - 0.0086}"/>
     <parent link="wrist_2_link"/>
     <child link="CAM_support_link"/> 
   </joint>
 
-  <!-- REALSENSE CODE -->
+  ########################################
+  # Realsense code
+  ########################################
+  <sensor_d435 parent="CAM_support_link">
+    <origin xyz="-0.0277 -0.002 -0.0075" rpy="0 0 0"/>
+  </sensor_d435>
 
   <link name="d435_realsense"/>
-
   <joint name="wrist3_camera" type="fixed">
     <parent link="wrist_3_link"/>
     <child link="d435_realsense"/>
     <origin xyz="0.0 0.0 0.0" rpy="0.0 0.0 0.0"/>
   </joint>
 
-  <!-- GAZEBO ROBOTIQ CODE -->
+  ########################################
+  # Robotiq code
+  ########################################
 
   <link name="robotiq_coupler">
     <visual>
@@ -124,54 +128,5 @@
   <xacro:robotiq_85_gripper prefix="" parent="robotiq_coupler">
     <origin xyz="0 0 0.004" rpy="0 ${-pi/2} ${pi}"/>
   </xacro:robotiq_85_gripper>
-
-  <!-- <gazebo reference="wrist_3_joint"> -->
-  <!-- <gazebo reference="robotiq_85_left_finger_tip_joint">
-    <provideFeedback>true</provideFeedback>
-  </gazebo>
-  
-   <gazebo>
-    <plugin name="ft_sensor_plugin" filename="libgazebo_ros_ft_sensor.so">
-      <updateRate>250.0</updateRate>
-      <topicName>ft_sensor/raw</topicName> -->
-      <!-- <gaussianNoise>0.0</gaussianNoise> -->
-      <!-- <jointName>wrist_3_joint</jointName> -->
-      <!-- <jointName>robotiq_85_left_finger_tip_joint</jointName>
-    </plugin>
-   </gazebo> -->
-
-  <!-- <gazebo>
-    <gripper name="gazebo_gripper">
-      <grasp_check>
-        <attach_steps>5</attach_steps>
-        <detach_steps>10</detach_steps>
-        <min_contact_count>3</min_contact_count>
-      </grasp_check>
-      <gripper_link>robotiq_85_left_finger_tip_link</gripper_link>
-      <gripper_link>robotiq_85_right_finger_tip_link</gripper_link>
-      <palm_link>robotiq_85_base_link</palm_link>
-    </gripper>
-  </gazebo> -->
-
-
-  <!-- <gazebo>
-     
-    <plugin name="gazebo_grasp_fix" filename="libgazebo_grasp_fix.so">
-     <arm>
-        <arm_name>gazebo_gripper</arm_name>
-        <palm_link>robotiq_85_left_inner_knuckle_link</palm_link>
-        <gripper_link>robotiq_85_left_finger_tip_link</gripper_link>
-        <palm_link>robotiq_85_right_inner_knuckle_link</palm_link>
-        <gripper_link>robotiq_85_right_finger_tip_link</gripper_link>
-     </arm>
-     <forces_angle_tolerance>300</forces_angle_tolerance>
-     <update_rate>25</update_rate>
-     <grip_count_threshold>1</grip_count_threshold>
-     <max_grip_count>30</max_grip_count>
-     <release_tolerance>0.005</release_tolerance>
-     <disable_collisions_on_attach>false</disable_collisions_on_attach>
-     <contact_topic>/gazebo/default/physics/contacts</contact_topic>
-  </plugin>
-  </gazebo> -->
 
 </robot>
