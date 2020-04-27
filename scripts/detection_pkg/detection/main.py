@@ -21,7 +21,7 @@ from Kinect import Kinect
 from std_msgs.msg import String, Int32MultiArray
 from sensor_msgs.msg import Image
 from sensor_msgs.msg import PointCloud2
-from cv_bridge import CvBridge, CvBridgeError
+from cv_bridge import CvBridge
 import rospkg
 
 def filter_predictions(ids, scores, bboxes, threshold=0.0):
@@ -34,14 +34,7 @@ def filter_predictions(ids, scores, bboxes, threshold=0.0):
 
 
 class Detector:
-	def __init__(self, model_path, model='ssd512', ctx='cpu', classes='normal'):
-
-		
-		#dataset_root = pjoin(cfg.dataset_folder, dataset)
-		# with open(pjoin(dataset_root, 'classes.txt'), 'r') as f:
-		#     classes = [line.strip() for line in f.readlines()]
-		#     classes = [line for line in classes if line]
-		
+	def __init__(self, model_path, model='ssd512', ctx='gpu', classes='normal'):
 		if classes == 'normal':
 			self.classes = cfg.CLASSES
 		elif classes == 'grasp':
@@ -123,7 +116,7 @@ class Detector:
 		
 		in_height, in_width = img.shape[:2]
 
-		timg = self.transform(mx.nd.array(img))
+		timg = self.transform(nd.array(img))
 		t_height, t_width = timg.shape[1:]
 
 		width_ratio = in_width / t_width
@@ -173,32 +166,30 @@ while not rospy.is_shutdown():
 			points_to_send_list = []
 			# print("size: ", size)
 			while i < size:
-				# print(caixas[i].class_name)# == "test"
-				# print(caixas[i])
 				caixas[i].class_name = ""
-				img=caixas.draw(im)
-				cv2.circle(img,(int(caixas[i].x1),int(caixas[i].y1)), 2, (0,0,255), -1)
-				cv2.circle(img,(int(caixas[i].x2),int(caixas[i].y2)), 2, (0,0,255), -1)
-				cv2.imshow('image',img)
-				cv2.waitKey(1)
-				#print(caixas)
+				
 				point1= Point()
 				point2= Point()
 				point1.x=int(caixas[i].x1)
-				points_to_send_list.append(point1.x)
 				point1.y=int(caixas[i].y1)
-				points_to_send_list.append(point1.y)
 				point2.x=int(caixas[i].x2)
-				points_to_send_list.append(point2.x)
 				point2.y=int(caixas[i].y2)
-				points_to_send_list.append(point2.y)
-				#print(point1)
-				#print(point2)
-				pub1.publish(point1)
-				pub2.publish(point2)
-				# i=size
+
+				# Verify if the bouding box is too big for the image and ignore
+				if abs(point2.x - point1.x) < 200:
+					points_to_send_list.append(point1.x)
+					points_to_send_list.append(point1.y)
+					points_to_send_list.append(point2.x)
+					points_to_send_list.append(point2.y)
+					
+					img=caixas.draw(im)
+					cv2.circle(img,(int(caixas[i].x1),int(caixas[i].y1)), 2, (0,0,255), -1)
+					cv2.circle(img,(int(caixas[i].x2),int(caixas[i].y2)), 2, (0,0,255), -1)
+					# cv2.imshow('image',img)
+					# cv2.waitKey(1)
+				
+					ssd_img_pub.publish(CvBridge().cv2_to_imgmsg(img, 'bgr8'))
 				i+=1
-				ssd_img_pub.publish(CvBridge().cv2_to_imgmsg(img, 'bgr8'))
 			points_to_send.data = points_to_send_list # assign the array with the value you want to send
 			print(points_to_send.data)
 			arraypub.publish(points_to_send)

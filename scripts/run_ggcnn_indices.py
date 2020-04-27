@@ -201,13 +201,6 @@ class ssgg_grasping(object):
         self.depth_image_shot = rospy.wait_for_message("camera/depth/image_raw", Image)
         self.depth_image_shot.header = self.depth_message.header
 
-        # depth_image_shot = self.depth_image_shot
-        # depth = self.bridge.imgmsg_to_cv2(depth_image_shot)
-        # depth_image_shot_copy = depth.copy()
-        # height_res, width_res = depth_image_shot_copy.shape
-        # self.depth_image_shot_copy = depth_image_shot_copy[0 : self.crop_size,
-        # (width_res - self.crop_size)//2 : (width_res - self.crop_size)//2 + self.crop_size]
-
     def copy_obj_to_depth_img(self):
         points = self.points_vec
         depth_image_shot = deepcopy(self.depth_image_shot)
@@ -346,22 +339,24 @@ class ssgg_grasping(object):
         """
         print "Aqui 1"
         depth_crop = self.depth_crop
+        depth_image = self.bridge.imgmsg_to_cv2(self.depth_message_ggcnn)
         color_img = self.color_img 
         if depth_crop is not None and color_img is not None:
             ang = self.ang
             width_px = self.width_px
             max_pixel = self.max_pixel
+            max_pixel_reescaled = self.max_pixel_reescaled
 
             rectangle_ang = ang #- np.pi/2
             
             vetx = [-(width_px/2), (width_px/2), (width_px/2), -(width_px/2)]
             vety = [10, 10, -10, -10]
             
-            X = [ int((     vetx[i]*np.cos(rectangle_ang) + vety[i]*np.sin(rectangle_ang)) + max_pixel[1]) for i in range(len(vetx))]
-            Y = [ int((-1 * vetx[i]*np.sin(rectangle_ang) + vety[i]*np.cos(rectangle_ang)) + max_pixel[0]) for i in range(len(vetx))]
+            X = [ int((     vetx[i]*np.cos(rectangle_ang) + vety[i]*np.sin(rectangle_ang)) + max_pixel_reescaled[1]) for i in range(len(vetx))]
+            Y = [ int((-1 * vetx[i]*np.sin(rectangle_ang) + vety[i]*np.cos(rectangle_ang)) + max_pixel_reescaled[0]) for i in range(len(vetx))]
      
-            rr1, cc1 = circle(max_pixel[0], max_pixel[1], 5)
-            depth_crop_copy = depth_crop.copy()
+            rr1, cc1 = circle(max_pixel_reescaled[0], max_pixel_reescaled[1], 5)
+            depth_crop_copy = depth_image.copy()
             depth_crop_copy[rr1, cc1] = 0.2
             cv2.line(depth_crop_copy, (X[0],Y[0]), (X[1],Y[1]), (0, 0, 0), 2)
             cv2.line(depth_crop_copy, (X[1],Y[1]), (X[2],Y[2]), (0.2, 0.2, 0.2), 2)

@@ -25,11 +25,15 @@ class test_aligment(object):
 		rospy.Subscriber("/camera/color/image_raw", Image, self.image_callback, queue_size=10)
 		rospy.Subscriber("/ssd/img/bouding_box", Image, self.ssd_bb_color_callback, queue_size=10)
 		rospy.Subscriber("/ggcnn/img/grasp_depth_with_square", Image, self.grasp_depth_with_square_callback, queue_size=10)
+		rospy.Subscriber("/ggcnn/img/depth_shot_with_copied_img", Image, self.depth_shot_with_copied_image_callback, queue_size=10)
 		# rospy.Subscriber("/ggcnn/img/depth_ssd_square", Image, self.ggcnn_ssd_callback, queue_size=10)
 		rospy.Subscriber('sdd_points_array', Int32MultiArray, self.bounding_boxes_callback, queue_size=10)
 
 	def get_depth_callback(self, msg):
 		self.depth_image = self.transform_depth_img(msg)
+
+	def depth_shot_with_copied_image_callback(self, msg):
+		self.depth_shot_with_copied_image = self.transform_depth_img(msg)
 		
 	def image_callback(self, msg):
 		self.color_image = self.transform_color_img(msg)
@@ -49,7 +53,7 @@ class test_aligment(object):
 		color_image = img
 		color_image.encoding = 'bgr8'
 		color_image = self.bridge.imgmsg_to_cv2(color_image)
-		color_image = cv2.cvtColor(color_image, cv2.COLOR_RGB2GRAY)
+		# color_image = cv2.cvtColor(color_image, cv2.COLOR_RGB2GRAY)
 		return color_image
 
 	def transform_depth_img(self, img):
@@ -57,15 +61,15 @@ class test_aligment(object):
 		depth_image.encoding = "mono16"
 		depth_image = self.bridge.imgmsg_to_cv2(depth_image) # 16UC1
 		depth_image = cv2.normalize(depth_image, dst=None, alpha=0, beta=255, norm_type=cv2.NORM_MINMAX, dtype=cv2.CV_8UC1)
+		depth_image = cv2.cvtColor(depth_image, cv2.COLOR_GRAY2RGB)
 		return depth_image
-			
-	def show_both_images(self):				
-		# added_image_raw = cv2.addWeighted(depth_image,0.8,color_image,0.2,0)
-		# added_image_raw2 = cv2.addWeighted(ggcnn_ssd_depth_image,0.8,ssd_bb_color_image,0.2,0)
-		# numpy_horizontal_concat = np.concatenate((added_image_raw, added_image_raw2), axis=1)
-		cv2.imshow('image', self.color_image)
-		k=cv2.waitKey(10) # refresh each 10ms
 
+	def resize(self, img, scale_percent):
+		width = int(img.shape[1] * scale_percent / 100)
+		height = int(img.shape[0] * scale_percent / 100)
+		dsize = (width, height)
+		return cv2.resize(img, dsize)
+			
 	def bounding_boxes_callback(self, msg):
 		center_calibrated_point = self.center_calibrated_point
 		print("msg: ", msg)
@@ -128,6 +132,19 @@ class test_aligment(object):
 	def concatenated_images(self):
 		numpy_horizontal_concat = np.concatenate((image, grey_3_channel), axis=1)
 
+	def show_all_images(self):				
+		ssd_image = self.ssd_bb_color_image
+		depth_raw_image = self.depth_image
+		depth_filtered_image = self.grasp_depth_with_square_image
+
+		if ssd_image is not None:
+			percentage_of_reduction = 35
+			ssd_image = self.resize(ssd_image, percentage_of_reduction)
+			depth_raw_image = self.resize(depth_raw_image, percentage_of_reduction)
+			depth_filtered_image = self.resize(depth_filtered_image, percentage_of_reduction)
+			numpy_horizontal_concat = np.concatenate((ssd_image, depth_raw_image, depth_filtered_image), axis=1)
+			cv2.imshow('image', numpy_horizontal_concat)
+			k=cv2.waitKey(10) # refresh each 10ms
 
 def main():
 	rospy.init_node("test_aligment")
@@ -137,7 +154,8 @@ def main():
 	while not rospy.is_shutdown():
 		# test.show_depth_image_test('depth_with_square')
 		# test.show_depth_image_test('ssd')
-		test.show_depth_image_test('grasp_depth_with_square')
+		# test.show_depth_image_test('grasp_depth_with_square')
+		test.show_all_images()
 	
 if __name__ == '__main__':
 	try:

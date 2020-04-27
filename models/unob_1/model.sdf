@@ -8,7 +8,7 @@
         <geometry>
           <mesh>
             <uri>model://unob_1/meshes/unob_1.dae</uri>
-            <scale>0.3 0.3 2.2</scale>
+            <scale>0.4 0.4 2.2</scale>
           </mesh>
         </geometry>
       </collision>
@@ -17,7 +17,7 @@
         <geometry>
           <mesh>
             <uri>model://unob_1/meshes/unob_1.dae</uri>
-            <scale>0.3 0.3 2.2</scale>
+            <scale>0.4 0.4 2.2</scale>
           </mesh>
         </geometry>
         <material>

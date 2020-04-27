@@ -129,7 +129,7 @@ def main():
 	# moving4 = Moving("moldura_final", Spawning1, x_position + ptFinal[0], y_position + ptFinal[1], z_position + ptFinal[2], oriFinal, moldura_final)
 	# moving4.spawning()
 
-def unob_1():
+def unob_1_uncluttered():
 	rospack = rospkg.RosPack()
 	rospy.init_node('spawn_model')
 	Spawning1 = rospy.ServiceProxy("gazebo/spawn_sdf_model", SpawnModel)
@@ -146,6 +146,8 @@ def unob_1():
 	part2 = Home + '/models/part2/model.sdf'
 	part3 = Home + '/models/part3/model.sdf'
 	unob_1 = Home + '/models/unob_1/model.sdf'
+	unob_2 = Home + '/models/unob_2/model.sdf'
+	unob_3 = Home + '/models/unob_3/model.sdf'
 	moldura_final = Home + '/models/moldura_final/model.sdf'
 	marker_bot = Home + '/models/markerbot/model.sdf'
 
@@ -167,31 +169,41 @@ def unob_1():
 
 	rospy.sleep(0.3)
 
-	ptFinal = [-0.048, -0.432, 0.1] # all together in the bin
+	ptFinal = [-0.09, -0.47, 0.1] # all together in the bin
 	oriFinal = quaternion_from_euler(0.0, 0.0, 0.0)
 	moving4 = Moving("part1", Spawning1, x_position + ptFinal[0], y_position + ptFinal[1], z_position + ptFinal[2], oriFinal, part1)
 	moving4.spawning()    
 
-	ptFinal = [-0.0531, -0.495, 0.1] # all together in the bin
+	ptFinal = [-0.04, -0.46, 0.1] # all together in the bin
 	oriFinal = quaternion_from_euler(0.0, 0.0, -1.57)
 	moving4 = Moving("part2", Spawning1, x_position + ptFinal[0], y_position + ptFinal[1], z_position + ptFinal[2], oriFinal, part2)
 	moving4.spawning()
 
-	ptFinal = [-0.12, -0.497, 0.1] # all together in the bin
+	ptFinal = [-0.05, -0.5, 0.1] # all together in the bin
 	oriFinal = quaternion_from_euler(0.0, 0.0, 0.0)
 	moving4 = Moving("bico_dosador", Spawning1, x_position + ptFinal[0], y_position + ptFinal[1], z_position + ptFinal[2], oriFinal, bico_dosador)
 	moving4.spawning()
 
-	ptFinal = [-0.19, -0.497, 0.1] # all together in the bin
+	ptFinal = [-0.09, -0.41, 0.1] # all together in the bin
 	oriFinal = quaternion_from_euler(0.0, 0.0, 0.0)
 	moving4 = Moving("part3", Spawning1, x_position + ptFinal[0], y_position + ptFinal[1], z_position + ptFinal[2], oriFinal, part3)
 	moving4.spawning()
 
-	ptFinal = [-0.121, -0.433, 0.1] # all together in the bin
+	ptFinal = [-0.045, -0.41, 0.1] # all together in the bin
 	oriFinal = quaternion_from_euler(0.0, 0.0, 0.0)
 	moving4 = Moving("unob_1", Spawning1, x_position + ptFinal[0], y_position + ptFinal[1], z_position + ptFinal[2], oriFinal, unob_1)
 	moving4.spawning()
 
+	ptFinal = [-0.13, -0.41, 0.1] # all together in the bin
+	oriFinal = quaternion_from_euler(0.0, 0.0, 0.0)
+	moving4 = Moving("unob_2", Spawning1, x_position + ptFinal[0], y_position + ptFinal[1], z_position + ptFinal[2], oriFinal, unob_2)
+	moving4.spawning()
+
+	ptFinal = [-0.13, -0.45, 0.1] # all together in the bin
+	oriFinal = quaternion_from_euler(0.0, 0.0, 0.0)
+	moving4 = Moving("unob_3", Spawning1, x_position + ptFinal[0], y_position + ptFinal[1], z_position + ptFinal[2], oriFinal, unob_3)
+	moving4.spawning()
+
 if __name__ == '__main__':
 	# main()
-	unob_1()
+	unob_1_uncluttered()

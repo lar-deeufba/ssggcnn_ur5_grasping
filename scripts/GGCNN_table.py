@@ -104,6 +104,11 @@ class vel_control(object):
 			rospy.Subscriber('/right_finger_bumper_vals', ContactsState, self.monitor_contacts_right_finger_callback) # ContactState
 			self.right_collision = False
 			self.contactState_right = ContactState()
+
+			self.client_gripper = actionlib.SimpleActionClient('gripper_controller_pos/follow_joint_trajectory', FollowJointTrajectoryAction)
+			print "Waiting for server (gripper_controller_pos)..."
+			self.client_gripper.wait_for_server()
+			print "Connected to server (gripper_controller_pos)"
 			
 		# GGCNN
 		self.joint_values_ggcnn = []
@@ -115,7 +120,7 @@ class vel_control(object):
 		if self.args.gazebo:
 			self.offset_x = 0.005
 			self.offset_y = 0.0
-			self.offset_z = 0.02
+			self.offset_z = 0.028
 		else:
 			self.offset_x = -0.03 # 0.002
 			self.offset_y = 0.02 # -0.05
@@ -142,10 +147,16 @@ class vel_control(object):
 		self.ur5_param = (0.089159, 0.13585, -0.1197, 0.425, 0.39225, 0.10915, 0.093, 0.09465, 0.0823 + 0.15)
 
 	def turn_velocity_controller_on(self):
-		self.controller_switch('joint_group_vel_controller', 'pos_based_pos_traj_controller', 1)
-		
+		self.controller_switch(['joint_group_vel_controller'], ['pos_based_pos_traj_controller'], 1)
+
 	def turn_position_controller_on(self):
-		self.controller_switch('pos_based_pos_traj_controller', 'joint_group_vel_controller', 1)
+		self.controller_switch(['pos_based_pos_traj_controller'], ['joint_group_vel_controller'], 1)
+
+	def turn_gripper_velocity_controller_on(self):
+		self.controller_switch(['gripper_controller_vel'], ['gripper_controller_pos'], 1)
+
+	def turn_gripper_position_controller_on(self):
+		self.controller_switch(['gripper_controller_pos'], ['gripper_controller_vel'], 1)
 
 	def monitor_contacts_left_finger_callback(self, msg):
 		if msg.states:
@@ -153,10 +164,15 @@ class vel_control(object):
 			self.left_collision = True
 			string = msg.states[0].collision1_name
 			string_collision = re.findall(r'::(.+?)::',string)[0]
+			print("Left String_collision: ", string_collision)
 			if string_collision in self.finger_links:
 				string = msg.states[0].collision2_name
-				self.string = re.findall(r'::(.+?)::',string)[0]
-			self.string = string_collision
+				print("Left Real string (object): ", string)
+				self.string = re.findall(r'::(.+?)::', string)[0]
+				print("Left before: ", self.string)
+			else:
+				self.string = string_collision
+				print("Left in else: ", string_collision)
 		else:
 			self.left_collision = False
 
@@ -165,10 +181,15 @@ class vel_control(object):
 			self.right_collision = True
 			string = msg.states[0].collision1_name
 			string_collision = re.findall(r'::(.+?)::',string)[0]
+			print("Right String_collision: ", string_collision)
 			if string_collision in self.finger_links:
 				string = msg.states[0].collision2_name
+				print("Right Real string (object): ", string)
 				self.string = re.findall(r'::(.+?)::',string)[0]
-			self.string = string_collision
+				print("Right before: ", self.string)
+			else:
+				self.string = string_collision
+				print("Right in else: ", self.string)
 		else:
 			self.right_collision = False
 
@@ -201,7 +222,7 @@ class vel_control(object):
 		object_pose[2] += self.offset_z
 		
 		self.posCB = object_pose
-		self.ori = self.d[3]
+		self.ori = -1*self.d[3]
 
 		self.br.sendTransform((object_pose[0], 
                                object_pose[1],
@@ -213,6 +234,7 @@ class vel_control(object):
 		
 	def get_link_position_picking(self):
 		link_name = self.string
+		print("Link name: ", link_name)
 		model_coordinates = self.model_coordinates(self.string, 'wrist_3_link')
 		self.model_pose_picking = model_coordinates.link_state.pose
 
@@ -241,8 +263,8 @@ class vel_control(object):
 		Returns:
 			sol {list} -- Joint angles or None if track_ik is not able to find a valid solution
 		"""
-		camera_support_angle_offset = 0.25
-		# camera_support_angle_offset = 0.0
+		# camera_support_angle_offset = 0.25
+		camera_support_angle_offset = 0.0
 		
 		q = quaternion_from_euler(0.0, -3.14 + camera_support_angle_offset, 0.0)
 		# Joint order:
@@ -378,6 +400,18 @@ class vel_control(object):
 
 		return True
 
+	def gripper_send_position_goal(self, position):
+		self.turn_gripper_position_controller_on()
+		goal = FollowJointTrajectoryGoal()
+		goal.trajectory = JointTrajectory()
+		goal.trajectory.joint_names = ['robotiq_85_left_knuckle_joint']
+		goal.trajectory.points.append(JointTrajectoryPoint(positions = [position],
+														   velocities = [0.4],
+														   accelerations = [0.0],
+														   time_from_start = rospy.Duration(0.2)))
+		self.client_gripper.send_goal(goal)
+
+
 	def gripper_init(self):
 		global CLOSE_GRIPPER_VEL, OPEN_GRIPPER_VEL
 		global MIN_GRIPPER_OPEN_INIT, MAX_GRIPPER_CLOSE_INIT
@@ -409,6 +443,8 @@ class vel_control(object):
 	def gripper_vel_control(self, action):
 		global GRIPPER_INIT, MIN_GRIPPER_OPEN_INIT
 		global CLOSE_GRIPPER_VEL, OPEN_GRIPPER_VEL
+
+		self.turn_gripper_velocity_controller_on()
 
 		max_distance = 0.085
 		angular_coeff = 0.11
@@ -478,7 +514,7 @@ class vel_control(object):
 	"""
 	def set_pos_robot(self, joint_values_param, time = 14.0):
 		rospy.sleep(0.1)
-		self.turn_position_controller_on()
+		# self.turn_position_controller_on()
 
 		joint_values = deepcopy(joint_values_param)
 
@@ -513,14 +549,19 @@ def main():
 	# Turn position controller ON
 	ur5_vel = vel_control(arg)
 
-	ur5_vel.turn_position_controller_on()
-	point_init = [-0.37, 0.11, 0.05] # [-0.35, 0.03, 0.05] - behind box - #[-0.40, 0.0, 0.15] - up
-	joint_values_home = ur5_vel.get_ik(point_init)
+	# ur5_vel.turn_position_controller_on()
+	point_init_home = [-0.37, 0.11, 0.15] # [-0.35, 0.03, 0.05] - behind box - #[-0.40, 0.0, 0.15] - up
+	joint_values_home = ur5_vel.get_ik(point_init_home)
 	ur5_vel.joint_values_home = joint_values_home
 
 	# Send the robot to the custom HOME position
 	raw_input("==== Press enter to 'home' the robot!")
 	rospy.on_shutdown(ur5_vel.home_pos)
+	ur5_vel.traj_planner(point_init_home)
+
+	# Remove all objects from the scene and press enter
+	raw_input("==== Press enter to move the robot to the 'depth cam shot' position!")
+	point_init = [-0.37, 0.11, 0.05]
 	ur5_vel.traj_planner(point_init)
 	# ur5_vel.set_pos_robot(joint_values_home)
 	
@@ -528,7 +569,8 @@ def main():
 	PICKING = False
 	if arg.gazebo:
 		rospy.loginfo("Starting the gripper in Gazebo! Please wait...")
-		ur5_vel.gripper_vel_control('open')
+		# ur5_vel.gripper_vel_control('open')
+		ur5_vel.gripper_send_position_goal(0.4)
 		rospy.loginfo("Gripper started!")   
 	else:
 		rospy.loginfo("Starting the real gripper! Please wait...")
@@ -567,6 +609,7 @@ def main():
 		raw_input("==== Press enter to close the gripper!")
 		if arg.gazebo:
 			ur5_vel.gripper_vel_control('close')
+			ur5_vel.get_link_position_picking()
 		else:
 			raw_input("==== Press enter to close the gripper!")
 			ur5_vel.command_gripper('c')
@@ -574,8 +617,8 @@ def main():
 		# Move the robot to put the object down after the robot is move backwards from the printer
 		# Need to be updated
 		raw_input("==== Press enter to move the object upwards!")
-		ur5_vel.get_link_position_picking()
-		rospy.sleep(0.1)
+		# ur5_vel.get_link_position_picking()
+		# rospy.sleep(0.1)
 		PICKING = True
 		ur5_vel.traj_planner([-0.4, 0.0, 0.15])
 
@@ -591,6 +634,8 @@ def main():
 
 		raw_input("==== Press enter to move to the initial position!")
 		ur5_vel.get_link_position_picking()
+		ur5_vel.traj_planner(point_init_home)
+		rospy.sleep(0.1)
 		ur5_vel.traj_planner(point_init)
 
 if __name__ == '__main__':

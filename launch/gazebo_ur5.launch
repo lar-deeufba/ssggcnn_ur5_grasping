@@ -103,7 +103,7 @@
 
   <!-- LOAD CONTROLLERS IN STOP MODE -->
   <arg name="stopped_controllers"
-       default="joint_group_vel_controller"/>
+       default="joint_group_vel_controller gripper_controller_pos"/>
 
   <node name="ros_control_controller_manager"
         pkg="controller_manager"
