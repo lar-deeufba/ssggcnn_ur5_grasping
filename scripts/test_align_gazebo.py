@@ -51,8 +51,8 @@ class test_aligment(object):
 
 	def transform_color_img(self, img):
 		color_image = img
-		color_image.encoding = 'bgr8'
-		color_image = self.bridge.imgmsg_to_cv2(color_image)
+		color_image.encoding = 'rgb8'
+		color_image = self.bridge.imgmsg_to_cv2(color_image, 'bgr8')
 		# color_image = cv2.cvtColor(color_image, cv2.COLOR_RGB2GRAY)
 		return color_image
 
@@ -146,6 +146,16 @@ class test_aligment(object):
 			cv2.imshow('image', numpy_horizontal_concat)
 			k=cv2.waitKey(10) # refresh each 10ms
 
+	def show_color_and_depth(self):
+		grasp_with_square = self.grasp_depth_with_square_image
+		color_image = self.color_image
+		percentage_of_reduction = 35
+		grasp_with_square = self.resize(grasp_with_square, percentage_of_reduction)
+		color_image = self.resize(color_image, percentage_of_reduction)
+		numpy_horizontal_concat = np.concatenate((color_image, grasp_with_square), axis=1)
+		cv2.imshow('image', numpy_horizontal_concat)
+		k=cv2.waitKey(10) # refresh each 10ms
+
 def main():
 	rospy.init_node("test_aligment")
 	test = test_aligment()
@@ -155,7 +165,8 @@ def main():
 		# test.show_depth_image_test('depth_with_square')
 		# test.show_depth_image_test('ssd')
 		# test.show_depth_image_test('grasp_depth_with_square')
-		test.show_all_images()
+		# test.show_all_images()
+		test.show_color_and_depth()
 	
 if __name__ == '__main__':
 	try:

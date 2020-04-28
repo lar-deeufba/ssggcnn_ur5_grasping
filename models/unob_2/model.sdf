@@ -1,7 +1,7 @@
 <?xml version="1.0" ?>
 <sdf version="1.5">
   <model name="unob_2">
-    <static>false</static>
+    <static>true</static>
     <link name="unob_2_link">
 
       <collision name="collision">

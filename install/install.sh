@@ -19,7 +19,7 @@ echo '###### Installing and upgrading pip | pathlib ######'
 sudo apt install python-pip
 pip install --upgrade pip
 pip install pathlib
-pip install mxnet
+pip install mxnet-cu00 # please install the mxnet for your cuda version
 pip install gluoncv
 pip install opencv-python
 
@@ -43,10 +43,6 @@ git clone https://github.com/ros-industrial/robotiq ../../robotiq
 
 echo '###### Cloning the track_ik package ######'
 git clone https://bitbucket.org/traclabs/trac_ik.git ../../track_ik
-
-# echo '###### Cloning the plotJuggler package ######'
-# git clone https://github.com/facontidavide/PlotJuggler ../../PlotJuggler
-# sudo apt-get install ros-kinetic-plotjuggler 
 
 echo '###### Cloning the openrave_catkin package ######'
 git clone https://github.com/personalrobotics/openrave_catkin ../../openrave_catkin

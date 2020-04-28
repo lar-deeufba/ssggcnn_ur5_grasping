@@ -94,7 +94,7 @@ def main():
 
     rospy.sleep(0.1)
 
-    ptFinal = [0.3, -0.2, 0.0]
+    ptFinal = [0.16, -0.45, 0.0]
     oriFinal = quaternion_from_euler(0.0, 0.0, 0.0)
     moving4 = Moving("bin_box", Spawning1, x_position + ptFinal[0], y_position + ptFinal[1], z_position + ptFinal[2], oriFinal, bin_box)
     moving4.spawning()

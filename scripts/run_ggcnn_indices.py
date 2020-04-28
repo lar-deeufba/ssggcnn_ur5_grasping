@@ -232,8 +232,6 @@ class ssgg_grasping(object):
         else:
             depth_message = self.depth_message
 
-        print "Aqui 0"
-
         # INPUT
         depth = self.bridge.imgmsg_to_cv2(depth_message)
         
@@ -337,7 +335,6 @@ class ssgg_grasping(object):
         Show the depth image with a rectangle representing the grasp
         Image resolution: 300x300
         """
-        print "Aqui 1"
         depth_crop = self.depth_crop
         depth_image = self.bridge.imgmsg_to_cv2(self.depth_message_ggcnn)
         color_img = self.color_img 
@@ -383,7 +380,6 @@ class ssgg_grasping(object):
         """
         points_out = self.points_out
 
-        print "Aqui 2"
         if points_out is not None:
             max_pixel = self.max_pixel
 
@@ -409,7 +405,6 @@ class ssgg_grasping(object):
         sin_img = self.sin_img
         width_img = self.width_out
 
-        print "Aqui 3"
         if grasp_img is not None:
             #Publish the output images (not used for control, only visualisation)
             grasp_img = self.bridge.cv2_to_imgmsg(grasp_img, 'bgr8')
@@ -431,7 +426,6 @@ class ssgg_grasping(object):
         width_m = self.width_m
         g_width = self.g_width
 
-        print "Aqui 4"
         # -1 is multiplied by cmd_msg.data[3] because the object_detected frame is inverted
         if self.args.real:
             offset_x = -0.03 # 0.002
@@ -466,9 +460,9 @@ def main():
     
     raw_input("Press enter to start the GGCNN")
     rate = rospy.Rate(120)
+    rospy.loginfo("Starting process")
     while not rospy.is_shutdown():
         # rospy.spin()
-        print "Running"
         if args.ssggcnn:
             grasp_detection.copy_obj_to_depth_img()
         grasp_detection.depth_process_ggcnn()

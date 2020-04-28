@@ -184,22 +184,27 @@ def unob_1_uncluttered():
 	moving4 = Moving("bico_dosador", Spawning1, x_position + ptFinal[0], y_position + ptFinal[1], z_position + ptFinal[2], oriFinal, bico_dosador)
 	moving4.spawning()
 
+	ptFinal = [0.16, -0.45, 0.0] # all together in the bin
+	oriFinal = quaternion_from_euler(0.0, 0.0, 0.0)
+	moving4 = Moving("little_bin_box", Spawning1, x_position + ptFinal[0], y_position + ptFinal[1], z_position + ptFinal[2], oriFinal, little_bin_box)
+	moving4.spawning()
+
 	# ptFinal = [-0.09, -0.41, 0.1] # all together in the bin
 	# oriFinal = quaternion_from_euler(0.0, 0.0, 0.0)
 	# moving4 = Moving("part3", Spawning1, x_position + ptFinal[0], y_position + ptFinal[1], z_position + ptFinal[2], oriFinal, part3)
 	# moving4.spawning()
 
-	ptFinal = [-0.045, -0.41, 0.1] # all together in the bin
+	ptFinal = [-0.058, -0.41, -0.001] # all together in the bin
 	oriFinal = quaternion_from_euler(0.0, 0.0, 0.0)
 	moving4 = Moving("unob_1", Spawning1, x_position + ptFinal[0], y_position + ptFinal[1], z_position + ptFinal[2], oriFinal, unob_1)
 	moving4.spawning()
 
-	ptFinal = [-0.13, -0.41, 0.1] # all together in the bin
+	ptFinal = [-0.13, -0.41, -0.002] # all together in the bin
 	oriFinal = quaternion_from_euler(0.0, 0.0, 0.0)
 	moving4 = Moving("unob_2", Spawning1, x_position + ptFinal[0], y_position + ptFinal[1], z_position + ptFinal[2], oriFinal, unob_2)
 	moving4.spawning()
 
-	ptFinal = [-0.13, -0.45, 0.1] # all together in the bin
+	ptFinal = [-0.141, -0.45, -0.002] # all together in the bin
 	oriFinal = quaternion_from_euler(0.0, 0.0, 0.0)
 	moving4 = Moving("unob_3", Spawning1, x_position + ptFinal[0], y_position + ptFinal[1], z_position + ptFinal[2], oriFinal, unob_3)
 	moving4.spawning()
@@ -207,3 +212,4 @@ def unob_1_uncluttered():
 if __name__ == '__main__':
 	# main()
 	unob_1_uncluttered()
+	# unob_cluttered()
