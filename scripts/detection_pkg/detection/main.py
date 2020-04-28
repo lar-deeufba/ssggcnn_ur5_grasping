@@ -7,7 +7,7 @@ import numpy as np
 import cv2
 
 import mxnet as mx
-from mxnet import nd
+from mxnet import nd, gpu
 from gluoncv import model_zoo
 from gluoncv.data.transforms import presets
 
@@ -31,7 +31,6 @@ def filter_predictions(ids, scores, bboxes, threshold=0.0):
 	fids = ids.squeeze().asnumpy()[idx]
 	fbboxes = bboxes.squeeze().asnumpy()[idx]
 	return fids, fscores, fbboxes
-
 
 class Detector:
 	def __init__(self, model_path, model='ssd512', ctx='gpu', classes='normal'):
@@ -75,10 +74,10 @@ class Detector:
 		else:
 			raise ValueError('Invalid model `{}`.'.format(model.lower()))
 
-		net = model_zoo.get_model(model_name, pretrained=False, ctx=ctx)
-		net.initialize(force_reinit=True, ctx=ctx)
+		net = model_zoo.get_model(model_name, pretrained=False, ctx=gpu(0))
+		net.initialize(force_reinit=True, ctx=gpu(0))
 		net.reset_class(classes=self.classes)
-		net.load_parameters(model_path, ctx=ctx)
+		net.load_parameters(model_path, ctx=gpu(0))
 		self.net = net
 
 
