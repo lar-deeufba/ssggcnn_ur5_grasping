@@ -36,7 +36,7 @@ PICKING = False # Tells the node that the object must follow the gripper
 def parse_args():
 	parser = argparse.ArgumentParser(description='AAPF_Orientation')
 	parser.add_argument('--gazebo', action='store_true', help='Set the parameters related to the simulated enviroonment in Gazebo')
-	parser.add_argument('--ssggcnn', action='store_true', help='Adapt some parameters to SSGGCNN')
+	parser.add_argument('--ggcnn', action='store_true', help='Adapt some parameters to SSGGCNN')
 	args = parser.parse_args()
 	return args
 
@@ -65,13 +65,13 @@ class vel_control(object):
 		# Gazebo topics
 		if self.args.gazebo:
 			# For picking
-			self.pub_model_position = rospy.Publisher('/gazebo/set_link_state', LinkState, queue_size=10)
+			self.pub_model_position = rospy.Publisher('/gazebo/set_link_state', LinkState, queue_size=1)
 			self.model_coordinates = rospy.ServiceProxy('/gazebo/get_link_state', GetLinkState)
 			self.delete_model_service = rospy.ServiceProxy('/gazebo/delete_model', DeleteModel)
-			rospy.Subscriber('gazebo/model_states', ModelStates, self.get_model_state_callback, queue_size=10)
+			rospy.Subscriber('gazebo/model_states', ModelStates, self.get_model_state_callback, queue_size=1)
 			
 			# Subscriber used to read joint values
-			rospy.Subscriber('/joint_states', JointState, self.ur5_actual_position_callback, queue_size=2)
+			rospy.Subscriber('/joint_states', JointState, self.ur5_actual_position_callback, queue_size=1)
 			rospy.sleep(1.0)
 			
 			# USED FOR COLLISION DETECTION
@@ -98,16 +98,14 @@ class vel_control(object):
 		self.grasp_cartesian_pose = []
 		self.gripper_angle_grasp = 0.0
 		self.final_orientation = 0.0
-		if self.args.gazebo and not self.args.ssggcnn:
-			print("AQUI 2")
+		if self.args.gazebo and not self.args.ggcnn:
 			self.offset_x = 0.0
 			self.offset_y = 0.0
 			self.offset_z = 0.020 #0.019
-		elif self.args.ssggcnn and self.args.gazebo:
-			print("AQUI")
+		elif self.args.gazebo and self.args.ggcnn:
 			self.offset_x = 0.0
 			self.offset_y = 0.0
-			self.offset_z = 0.015 #0.019			
+			self.offset_z = 0.014 #0.019			
 		else:
 			self.offset_x = -0.03 # 0.002
 			self.offset_y = 0.02 # -0.05
@@ -134,7 +132,6 @@ class vel_control(object):
 
 	def monitor_contacts_left_finger_callback(self, msg):
 		if msg.states:
-			# print(msg)
 			self.left_collision = True
 			string = msg.states[0].collision1_name
 			string_collision = re.findall(r'::(.+?)::',string)[0]
@@ -394,47 +391,37 @@ class vel_control(object):
 		command = self.genCommand(action, command)
 		self.pub_gripper_command.publish(command)  
 
-	def gripper_send_position_goal(self, position=0.3, action='move'):
+	def gripper_send_position_goal(self, position=0.3, velocity=0.4, action='move'):
+		self.turn_gripper_position_controller_on()
+		duration = 0.2
 		if action == 'pre_grasp_angle':
 			max_distance = 0.085
 			angular_coeff = 0.11
 			K = 1.3
 			angle = (max_distance - self.gripper_angle_grasp) / angular_coeff * K
 			position = angle
+			velocity = 0.4
+		elif action == 'pick':
+			position = 0.7
+			velocity = 0.05
+			duration = 8.0
 
-		self.turn_gripper_position_controller_on()
 		goal = FollowJointTrajectoryGoal()
 		goal.trajectory = JointTrajectory()
 		goal.trajectory.joint_names = ['robotiq_85_left_knuckle_joint']
 		goal.trajectory.points.append(JointTrajectoryPoint(positions=[position],
-														   velocities=[0.4],
+														   velocities=[velocity],
 														   accelerations=[0.0],
-														   time_from_start=rospy.Duration(0.2)))
+														   time_from_start=rospy.Duration(duration)))
 		self.client_gripper.send_goal(goal)
-
-	"""
-	Control the gripper by using velocity controller
-	"""
-	def gripper_vel_control(self, action):
-		global CLOSE_GRIPPER_VEL
-
-		self.turn_gripper_velocity_controller_on()
-		joint_vels_gripper = Float64MultiArray()
-
-		rate = rospy.Rate(100)
-		while not rospy.is_shutdown() and not self.robotic > 0.78 and not self.left_collision and not self.right_collision:
-			joint_vels_gripper.data = np.array([CLOSE_GRIPPER_VEL])
-			self.pub_vel_gripper.publish(joint_vels_gripper)
-			rate.sleep()
-		rospy.loginfo("Gripper stopped!")
-		joint_vels_gripper.data = np.array([0.0]) # stop gripper
-		self.pub_vel_gripper.publish(joint_vels_gripper)
-
+		if action == 'pick':
+			while not rospy.is_shutdown() and not self.left_collision and not self.right_collision:
+				pass
+			self.client_gripper.cancel_goal()
+		
 	def move_home_on_shutdown(self):
 		self.client.cancel_goal()
 		self.client_gripper.cancel_goal()
-		joint_vels_gripper.data = np.array([0.0]) # stop gripper
-		self.pub_vel_gripper.publish(joint_vels_gripper)
 		rospy.loginfo("Shutting down node...")
 
 def main():
@@ -476,7 +463,6 @@ def main():
 		# It prevents the gripper to collide with other objects when grasping
 		raw_input("==== Press enter to close the gripper to a pre-grasp angle!")
 		if arg.gazebo:
-			# ur5_vel.gripper_vel_control('close_to_angle')
 			ur5_vel.gripper_send_position_goal(action='pre_grasp_angle')
 		else:
 			ur5_vel.command_gripper('p')
@@ -485,10 +471,10 @@ def main():
 		# BE CAREFUL!
 		ur5_vel.traj_planner([], 'grasp', movement='slow')
 
-		rospy.loginfo("Closing the gripper")
+		rospy.loginfo("Picking object")
 
 		if arg.gazebo:
-			ur5_vel.gripper_vel_control('grasp_object')
+			ur5_vel.gripper_send_position_goal(action='pick')
 			ur5_vel.get_link_position_picking()
 		else:
 			raw_input("==== Press enter to close the gripper!")

@@ -36,7 +36,7 @@ class test_aligment(object):
 		self.depth_shot_with_copied_image = self.transform_depth_img(msg)
 		
 	def image_callback(self, msg):
-		self.color_image = self.transform_color_img(msg)
+		self.color_image = self.transform_color_img(msg, 'bgr8')
 
 	def grasp_depth_with_square_callback(self, msg):
 		self.grasp_depth_with_square_image = self.transform_depth_img(msg)
@@ -49,10 +49,10 @@ class test_aligment(object):
 		if msg is not None:
 			self.ggcnn_ssd_depth_image = self.transform_depth_img(msg)
 
-	def transform_color_img(self, img):
+	def transform_color_img(self, img, encoding='rgb8'):
 		color_image = img
 		color_image.encoding = 'rgb8'
-		color_image = self.bridge.imgmsg_to_cv2(color_image, 'bgr8')
+		color_image = self.bridge.imgmsg_to_cv2(color_image, encoding)
 		# color_image = cv2.cvtColor(color_image, cv2.COLOR_RGB2GRAY)
 		return color_image
 
@@ -165,8 +165,8 @@ def main():
 		# test.show_depth_image_test('depth_with_square')
 		# test.show_depth_image_test('ssd')
 		# test.show_depth_image_test('grasp_depth_with_square')
-		# test.show_all_images()
-		test.show_color_and_depth()
+		test.show_all_images()
+		# test.show_color_and_depth()
 	
 if __name__ == '__main__':
 	try:
