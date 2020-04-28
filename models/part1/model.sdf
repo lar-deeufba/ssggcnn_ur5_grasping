@@ -1,14 +1,14 @@
 <?xml version="1.0" ?>
 <sdf version="1.5">
   <model name="Part1">
-    <static>false</static>
+    <static>true</static>
     <link name="part1_link">
 
       <collision name="collision">
         <geometry>
           <mesh>
             <uri>model://part1/meshes/part1.dae</uri>
-            <scale>1.0 1.0 1.0</scale>
+            <scale>1.1 1.1 1.1</scale>
           </mesh>
         </geometry>
       </collision>
@@ -17,7 +17,7 @@
         <geometry>
           <mesh>
             <uri>model://part1/meshes/part1.dae</uri>
-            <scale>1.0 1.0 1.0</scale>
+            <scale>1.1 1.1 1.1</scale>
           </mesh>
         </geometry>
         <material>

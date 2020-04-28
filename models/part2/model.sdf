@@ -1,7 +1,7 @@
 <?xml version="1.0" ?>
 <sdf version="1.5">
   <model name="Part2">
-    <static>false</static>
+    <static>true</static>
     <link name="part2_link">
 
       <collision name="collision">

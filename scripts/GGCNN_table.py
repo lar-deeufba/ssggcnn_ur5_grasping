@@ -73,7 +73,7 @@ class vel_control(object):
 		self.client.wait_for_server()
 		print "Connected to server (pos_based_pos_traj_controller)"
 		
-		# Used by the traj planner
+		# Used by the Quintic Traj Planner
 		self.initial_traj_duration = 5.0
 		self.final_traj_duration = 500.0
 
@@ -81,7 +81,8 @@ class vel_control(object):
 		if self.args.gazebo:
 			# For picking
 			self.pub_model_position = rospy.Publisher('/gazebo/set_link_state', LinkState, queue_size=10)
-			self.model_coordinates = rospy.ServiceProxy( '/gazebo/get_link_state', GetLinkState)
+			self.model_coordinates = rospy.ServiceProxy('/gazebo/get_link_state', GetLinkState)
+			rospy.Subscriber('gazebo/model_states', ModelStates, self.get_model_state_callback, queue_size=10)
 			
 			# Subscriber used to read joint values
 			rospy.Subscriber('/joint_states', JointState, self.ur5_actual_position_callback, queue_size=2)
@@ -114,7 +115,7 @@ class vel_control(object):
 		if self.args.gazebo:
 			self.offset_x = 0.0
 			self.offset_y = 0.0
-			self.offset_z = 0.02
+			self.offset_z = 0.019
 		else:
 			self.offset_x = -0.03 # 0.002
 			self.offset_y = 0.02 # -0.05
@@ -203,6 +204,7 @@ class vel_control(object):
 		
 		self.actual_position = [self.th1, self.th2, self.th3, self.th4, self.th5, self.th6]
 
+	def get_model_state_callback(self, msg):
 		self.object_picking()
 
 	"""
@@ -218,7 +220,7 @@ class vel_control(object):
 		object_pose[2] += self.offset_z
 		
 		self.posCB = object_pose
-		self.ori = -1*self.d[3]
+		self.ori = self.d[3]
 
 		self.br.sendTransform((object_pose[0], 
                                object_pose[1],
@@ -385,21 +387,11 @@ class vel_control(object):
 		command = self.genCommand(action, command)
 		self.pub_gripper_command.publish(command)  
 
-	"""
-	This method check if the goal position was reached
-	"""
-	def all_close(self, goal, tolerance = 0.015):
-		error = np.sum([(self.actual_position[i] - goal[i])**2 for i in range(6)])
-		if error > tolerance:
-			return False
-
-		return True
-
 	def gripper_send_position_goal(self, position = 0.3, action = 'move'):
 		if action == 'pre_grasp_angle':
 			max_distance = 0.085
 			angular_coeff = 0.11
-			K = 1.5
+			K = 1.3
 			angle = (max_distance - self.gripper_angle_grasp) / angular_coeff * K
 			position = angle
 			print("Angle: ", angle)
@@ -430,7 +422,8 @@ class vel_control(object):
 		# While rospy is not shutdown and gripper is still running and the angle of the gripper is not greater than 0.7
 		# and colliisions of borth gripper occur (the collision must occur to both grippers tip in order to stop them.
 		# That's why we use OR
-		while not rospy.is_shutdown() and GRIPPER_INIT and not self.robotic > 0.73 and not self.left_collision and not self.right_collision:
+		while not rospy.is_shutdown() and GRIPPER_INIT and not self.robotic > 0.78 and not self.left_collision and not self.right_collision:
+			print(self.robotic)
 			self.joint_vels_gripper.data = np.array([CLOSE_GRIPPER_VEL])
 			self.pub_vel_gripper.publish(self.joint_vels_gripper)
 			rate.sleep()		

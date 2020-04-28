@@ -169,25 +169,25 @@ def unob_1_uncluttered():
 
 	rospy.sleep(0.3)
 
-	ptFinal = [-0.09, -0.47, 0.1] # all together in the bin
+	ptFinal = [-0.09, -0.47, -0.004] # all together in the bin
 	oriFinal = quaternion_from_euler(0.0, 0.0, 0.0)
 	moving4 = Moving("part1", Spawning1, x_position + ptFinal[0], y_position + ptFinal[1], z_position + ptFinal[2], oriFinal, part1)
 	moving4.spawning()    
 
-	ptFinal = [-0.04, -0.46, 0.1] # all together in the bin
+	ptFinal = [-0.043, -0.46, -0.002] # all together in the bin
 	oriFinal = quaternion_from_euler(0.0, 0.0, -1.57)
 	moving4 = Moving("part2", Spawning1, x_position + ptFinal[0], y_position + ptFinal[1], z_position + ptFinal[2], oriFinal, part2)
 	moving4.spawning()
 
-	ptFinal = [-0.05, -0.5, 0.1] # all together in the bin
+	ptFinal = [-0.05, -0.5, -0.005] # all together in the bin
 	oriFinal = quaternion_from_euler(0.0, 0.0, 0.0)
 	moving4 = Moving("bico_dosador", Spawning1, x_position + ptFinal[0], y_position + ptFinal[1], z_position + ptFinal[2], oriFinal, bico_dosador)
 	moving4.spawning()
 
-	ptFinal = [-0.09, -0.41, 0.1] # all together in the bin
-	oriFinal = quaternion_from_euler(0.0, 0.0, 0.0)
-	moving4 = Moving("part3", Spawning1, x_position + ptFinal[0], y_position + ptFinal[1], z_position + ptFinal[2], oriFinal, part3)
-	moving4.spawning()
+	# ptFinal = [-0.09, -0.41, 0.1] # all together in the bin
+	# oriFinal = quaternion_from_euler(0.0, 0.0, 0.0)
+	# moving4 = Moving("part3", Spawning1, x_position + ptFinal[0], y_position + ptFinal[1], z_position + ptFinal[2], oriFinal, part3)
+	# moving4.spawning()
 
 	ptFinal = [-0.045, -0.41, 0.1] # all together in the bin
 	oriFinal = quaternion_from_euler(0.0, 0.0, 0.0)
