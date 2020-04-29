@@ -86,27 +86,18 @@ class ssgg_grasping(object):
         self.depth_pub_ssd_square = rospy.Publisher('ggcnn/img/depth_ssd_square', Image, queue_size=1)
         self.depth_pub_copied_img = rospy.Publisher('ggcnn/img/depth_shot_with_copied_img', Image, queue_size=1)
         self.depth_pub_shot = rospy.Publisher('ggcnn/img/depth_shot', Image, queue_size=1)
-        self.depth_with_square = rospy.Publisher('ggcnn/img/grasp_depth_with_square', Image, queue_size=1)
-        self.img_with_square = rospy.Publisher('ggcnn/img/grasp_img_with_square', Image, queue_size=1)
         self.ang_pub = rospy.Publisher('ggcnn/img/ang', Image, queue_size=1)
         self.cmd_pub = rospy.Publisher('ggcnn/out/command', Float32MultiArray, queue_size=1)
+        self.ggcnn_cmd_pub = rospy.Publisher('ggcnn/out/command_raw', Float32MultiArray, queue_size=1)
 
-        # Initialise some var
-        # self.depth = None
+        # Initialize some var
         self.color_img = None
         self.depth_crop = None
         self.depth_copy_for_point_depth = None
-        self.depth_copy_for_rectangle = None
         self.depth_message = None
         self.depth_message_ggcnn = None
-        self.pred_out = None
         self.points_out = None
-        self.height_res = []
-        self.width_res = []
-        self.depth_nan = None
         self.grasp_img = None
-        self.cos_out = None
-        self.sin_out = None
         self.ang_out = None
         self.width_out = None
         self.ang = 0.0
@@ -116,7 +107,6 @@ class ssgg_grasping(object):
         self.grasping_point = []
         self.depth_image_shot = None
         self.points_vec = []
-        self.depth_image_shot_copy = None
         self.depth_image_shot_with_object_copied = None
         self.sin_img = None
         self.cos_img = None
@@ -125,7 +115,7 @@ class ssgg_grasping(object):
         self.offset_ = 10
         self.center_calibrated_point = np.array([312, 240]) # x, y
 
-        # Initialise some globals.
+        # Initialize some globals.
         self.max_pixel = np.array([150, 150])
         self.max_pixel_reescaled = np.array([150, 150])
 
@@ -330,49 +320,15 @@ class ssgg_grasping(object):
         self.point_depth = point_depth
         self.grasping_point = grasping_point
 
-    def publish_grasping_rectangle_image(self):
-        """
-        Show the depth image with a rectangle representing the grasp
-        Image resolution: 300x300
-        """
-        depth_crop = self.depth_crop
-        depth_image = self.bridge.imgmsg_to_cv2(self.depth_message_ggcnn)
-        color_img = self.color_img 
-        if depth_crop is not None and color_img is not None:
-            ang = self.ang
-            width_px = self.width_px
-            max_pixel = self.max_pixel
-            max_pixel_reescaled = self.max_pixel_reescaled
-
-            rectangle_ang = ang #- np.pi/2
-            
-            vetx = [-(width_px/2), (width_px/2), (width_px/2), -(width_px/2)]
-            vety = [10, 10, -10, -10]
-            
-            X = [ int((     vetx[i]*np.cos(rectangle_ang) + vety[i]*np.sin(rectangle_ang)) + max_pixel_reescaled[1]) for i in range(len(vetx))]
-            Y = [ int((-1 * vetx[i]*np.sin(rectangle_ang) + vety[i]*np.cos(rectangle_ang)) + max_pixel_reescaled[0]) for i in range(len(vetx))]
-     
-            rr1, cc1 = circle(max_pixel_reescaled[0], max_pixel_reescaled[1], 5)
-            depth_crop_copy = depth_image.copy()
-            depth_crop_copy[rr1, cc1] = 0.2
-            cv2.line(depth_crop_copy, (X[0],Y[0]), (X[1],Y[1]), (0, 0, 0), 2)
-            cv2.line(depth_crop_copy, (X[1],Y[1]), (X[2],Y[2]), (0.2, 0.2, 0.2), 2)
-            cv2.line(depth_crop_copy, (X[2],Y[2]), (X[3],Y[3]), (0, 0, 0), 2)
-            cv2.line(depth_crop_copy, (X[3],Y[3]), (X[0],Y[0]), (0.2, 0.2, 0.2), 2)
-            self.depth_with_square.publish(self.bridge.cv2_to_imgmsg(depth_crop_copy))#, encoding="rgb8"))
-
-            max_pixel = [max_pixel[0], max_pixel[1] - 7]
-            X = [ int((     vetx[i]*np.cos(rectangle_ang) + vety[i]*np.sin(rectangle_ang)) + max_pixel[1]) for i in range(len(vetx))]
-            Y = [ int((-1 * vetx[i]*np.sin(rectangle_ang) + vety[i]*np.cos(rectangle_ang)) + max_pixel[0]) for i in range(len(vetx))]
-     
-            rr1, cc1 = circle(max_pixel[0], max_pixel[1], 5)
-            img_crop_copy = color_img.copy()
-            img_crop_copy[rr1, cc1] = 0.2
-            cv2.line(img_crop_copy, (X[0],Y[0]), (X[1],Y[1]), (0, 0, 0), 2)
-            cv2.line(img_crop_copy, (X[1],Y[1]), (X[2],Y[2]), (0.2, 0.2, 0.2), 2)
-            cv2.line(img_crop_copy, (X[2],Y[2]), (X[3],Y[3]), (0, 0, 0), 2)
-            cv2.line(img_crop_copy, (X[3],Y[3]), (X[0],Y[0]), (0.2, 0.2, 0.2), 2)
-            self.img_with_square.publish(self.bridge.cv2_to_imgmsg(img_crop_copy, encoding="rgb8"))
+    def publish_data_for_image_reading(self):
+        width_px = self.width_px
+        max_px = self.max_pixel
+        ang = self.ang
+        max_px_h = float(max_px[0])
+        max_px_w = float(max_px[1])
+        ggcnn_cmd_msg = Float32MultiArray()
+        ggcnn_cmd_msg.data = [width_px, max_px_h, max_px_w, ang]
+        self.ggcnn_cmd_pub.publish(ggcnn_cmd_msg)
 
     def get_grasp_image(self):
         """
@@ -426,16 +382,6 @@ class ssgg_grasping(object):
         width_m = self.width_m
         g_width = self.g_width
 
-        # -1 is multiplied by cmd_msg.data[3] because the object_detected frame is inverted
-        if self.args.real:
-            offset_x = -0.03 # 0.002
-            offset_y = 0.02 # -0.05
-            offset_z = 0.058 # 0.013
-        else:
-            offset_x = 0.005
-            offset_y = 0.0
-            offset_z = 0.02
-
         # Output the best grasp pose relative to camera.
         cmd_msg = Float32MultiArray()
         cmd_msg.data = [grasping_point[0]/1000.0, grasping_point[1]/1000.0, grasping_point[2]/1000.0, -1*ang, width_m, g_width]
@@ -466,7 +412,7 @@ def main():
             grasp_detection.copy_obj_to_depth_img()
         with TimeIt('ggcnn_process'):
             grasp_detection.depth_process_ggcnn()
-        grasp_detection.publish_grasping_rectangle_image()
+        grasp_detection.publish_data_for_image_reading()
         grasp_detection.get_grasp_image()
         grasp_detection.publish_images()
         grasp_detection.publish_data_to_robot()        

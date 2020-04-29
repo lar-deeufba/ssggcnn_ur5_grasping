@@ -8,6 +8,7 @@ import cv2
 from cv_bridge import CvBridge
 from cv_bridge import CvBridge, CvBridgeError
 import numpy as np
+from skimage.draw import circle
 
 class test_aligment(object):
 	def __init__(self):
@@ -20,14 +21,20 @@ class test_aligment(object):
 		self.bridge = CvBridge()
 		self.center_calibrated_point = np.array([312, 240]) # x, y
 		self.actual_depth_image = None
+		self.d = []
 
 		rospy.Subscriber("/camera/depth/image_raw", Image, self.get_depth_callback, queue_size=10)
 		rospy.Subscriber("/camera/color/image_raw", Image, self.image_callback, queue_size=10)
 		rospy.Subscriber("/ssd/img/bouding_box", Image, self.ssd_bb_color_callback, queue_size=10)
 		rospy.Subscriber("/ggcnn/img/grasp_depth_with_square", Image, self.grasp_depth_with_square_callback, queue_size=10)
+		rospy.Subscriber("/ggcnn/img/depth", Image, self.ggcnn_depth_callback, queue_size=10)
 		rospy.Subscriber("/ggcnn/img/depth_shot_with_copied_img", Image, self.depth_shot_with_copied_image_callback, queue_size=10)
 		# rospy.Subscriber("/ggcnn/img/depth_ssd_square", Image, self.ggcnn_ssd_callback, queue_size=10)
 		rospy.Subscriber('sdd_points_array', Int32MultiArray, self.bounding_boxes_callback, queue_size=10)
+
+		# GGCNN
+		rospy.Subscriber('ggcnn/out/command_raw', Float32MultiArray, self.ggcnn_command_callback, queue_size=1)
+
 
 	def get_depth_callback(self, msg):
 		self.depth_image = self.transform_depth_img(msg)
@@ -41,6 +48,9 @@ class test_aligment(object):
 	def grasp_depth_with_square_callback(self, msg):
 		self.grasp_depth_with_square_image = self.transform_depth_img(msg)
 
+	def ggcnn_depth_callback(self, msg):
+		self.grasp_depth_image = self.transform_ggcnn_depth_img(msg)
+		
 	def ssd_bb_color_callback(self, msg):
 		if msg is not None:
 			self.ssd_bb_color_image = self.transform_color_img(msg)
@@ -48,6 +58,14 @@ class test_aligment(object):
 	def ggcnn_ssd_callback(self, msg):
 		if msg is not None:
 			self.ggcnn_ssd_depth_image = self.transform_depth_img(msg)
+
+	def ggcnn_command_callback(self, msg):
+		"""
+		GGCNN Command Subscriber Callback
+		"""
+		# print(msg)
+		if msg.data is not None:
+			self.d = list(msg.data)
 
 	def transform_color_img(self, img, encoding='rgb8'):
 		color_image = img
@@ -60,8 +78,14 @@ class test_aligment(object):
 		depth_image = img
 		depth_image.encoding = "mono16"
 		depth_image = self.bridge.imgmsg_to_cv2(depth_image) # 16UC1
-		depth_image = cv2.normalize(depth_image, dst=None, alpha=0, beta=255, norm_type=cv2.NORM_MINMAX, dtype=cv2.CV_8UC1)
+		depth_image = cv2.normalize(depth_image, dst=None, alpha=0, beta=1, norm_type=cv2.NORM_MINMAX, dtype=cv2.CV_8UC1)
 		depth_image = cv2.cvtColor(depth_image, cv2.COLOR_GRAY2RGB)
+		return depth_image
+
+	def transform_ggcnn_depth_img(self, img):
+		depth_image = img
+		depth_image = self.bridge.imgmsg_to_cv2(depth_image)
+		depth_image = cv2.normalize(depth_image, dst=None, alpha=0, beta=1, norm_type=cv2.NORM_MINMAX)
 		return depth_image
 
 	def resize(self, img, scale_percent):
@@ -146,6 +170,34 @@ class test_aligment(object):
 			cv2.imshow('image', numpy_horizontal_concat)
 			k=cv2.waitKey(10) # refresh each 10ms
 
+	def show_depth_image_with_square(self):
+		grasp_depth_image = self.grasp_depth_image
+		# [grasping_point[0]/1000.0, grasping_point[1]/1000.0, grasping_point[2]/1000.0, -1*ang, width_m, g_width]
+		rectangle_ang = self.d[3]
+		max_pixel_w = self.d[2]
+		max_pixel_h = self.d[1]
+		width_px = self.d[0]
+
+		depth_crop_copy = grasp_depth_image.copy()
+		if grasp_depth_image is not None:			
+			vetx = [-(width_px/2), (width_px/2), (width_px/2), -(width_px/2)]
+			vety = [10, 10, -10, -10]
+			
+			X = [ int((     vetx[i]*np.cos(rectangle_ang) + vety[i]*np.sin(rectangle_ang)) + max_pixel_w) for i in range(len(vetx))]
+			Y = [ int((-1 * vetx[i]*np.sin(rectangle_ang) + vety[i]*np.cos(rectangle_ang)) + max_pixel_h) for i in range(len(vetx))]
+	 
+			rr1, cc1 = circle(max_pixel_h, max_pixel_w, 5)
+			depth_crop_copy[rr1, cc1] = 0.2
+			cv2.line(depth_crop_copy, (X[0],Y[0]), (X[1],Y[1]), (0, 0, 0), 2)
+			cv2.line(depth_crop_copy, (X[1],Y[1]), (X[2],Y[2]), (0.2, 0.2, 0.2), 2)
+			cv2.line(depth_crop_copy, (X[2],Y[2]), (X[3],Y[3]), (0, 0, 0), 2)
+			cv2.line(depth_crop_copy, (X[3],Y[3]), (X[0],Y[0]), (0.2, 0.2, 0.2), 2)
+		
+		numpy_horizontal_concat = np.concatenate((grasp_depth_image, depth_crop_copy), axis=1)
+		cv2.imshow('image', numpy_horizontal_concat)
+		k=cv2.waitKey(10) # refresh each 10ms
+
+
 	def show_color_and_depth(self):
 		grasp_with_square = self.grasp_depth_with_square_image
 		color_image = self.color_image
@@ -165,7 +217,8 @@ def main():
 		# test.show_depth_image_test('depth_with_square')
 		# test.show_depth_image_test('ssd')
 		# test.show_depth_image_test('grasp_depth_with_square')
-		test.show_all_images()
+		# test.show_all_images()
+		test.show_depth_image_with_square()
 		# test.show_color_and_depth()
 	
 if __name__ == '__main__':
