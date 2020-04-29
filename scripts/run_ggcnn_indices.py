@@ -38,8 +38,8 @@ class TimeIt:
 
     def __exit__(self, t, value, traceback):
         self.t1 = time.time()
-        if self.print_output:
-            print('%s: %s' % (self.s, self.t1 - self.t0))
+        print('%s: %s' % (self.s, self.t1 - self.t0))
+        
 
 def parse_args():
     parser = argparse.ArgumentParser(description='GGCN and SSD grasping')
@@ -462,10 +462,10 @@ def main():
     rate = rospy.Rate(120)
     rospy.loginfo("Starting process")
     while not rospy.is_shutdown():
-        # rospy.spin()
         if args.ssggcnn:
             grasp_detection.copy_obj_to_depth_img()
-        grasp_detection.depth_process_ggcnn()
+        with TimeIt('ggcnn_process'):
+            grasp_detection.depth_process_ggcnn()
         grasp_detection.publish_grasping_rectangle_image()
         grasp_detection.get_grasp_image()
         grasp_detection.publish_images()

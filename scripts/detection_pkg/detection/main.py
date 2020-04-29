@@ -5,7 +5,7 @@ import os
 from os.path import join as pjoin
 import numpy as np
 import cv2
-
+import time
 import mxnet as mx
 from mxnet import nd, gpu
 from gluoncv import model_zoo
@@ -31,6 +31,20 @@ def filter_predictions(ids, scores, bboxes, threshold=0.0):
 	fids = ids.squeeze().asnumpy()[idx]
 	fbboxes = bboxes.squeeze().asnumpy()[idx]
 	return fids, fscores, fbboxes
+
+class TimeIt:
+    def __init__(self, s):
+        self.s = s
+        self.t0 = None
+        self.t1 = None
+        self.print_output = False
+
+    def __enter__(self):
+        self.t0 = time.time()
+
+    def __exit__(self, t, value, traceback):
+        self.t1 = time.time()
+        print('%s: %s' % (self.s, self.t1 - self.t0))
 
 class Detector:
 	def __init__(self, model_path, model='ssd512', ctx='gpu', classes='normal'):
@@ -158,7 +172,8 @@ while not rospy.is_shutdown():
 	
 	if cam.has_image > 0:
 		im=cam.image
-		[caixas,timag]= det.detect(im)
+		with TimeIt('ssd_process_time'):
+			[caixas,timag]= det.detect(im)
 		size = len(caixas)
 		if size != 0:
 			i = 0
