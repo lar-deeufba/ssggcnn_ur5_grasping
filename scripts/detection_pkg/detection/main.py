@@ -47,7 +47,7 @@ class TimeIt:
         print('%s: %s' % (self.s, self.t1 - self.t0))
 
 class Detector:
-	def __init__(self, model_path, model='ssd512', ctx='gpu', classes='normal'):
+	def __init__(self, model_path, model='ssd512', ctx='cpu', classes='normal'):
 		if classes == 'normal':
 			self.classes = cfg.CLASSES
 		elif classes == 'grasp':
@@ -57,7 +57,7 @@ class Detector:
 		if ctx == 'cpu':
 			ctx = mx.cpu()
 		elif ctx == 'gpu':
-			ctx = mx.gpu()
+			ctx = mx.gpu(0)
 		else:
 			raise ValueError('Invalid context.')
 		self.ctx = ctx
@@ -88,10 +88,10 @@ class Detector:
 		else:
 			raise ValueError('Invalid model `{}`.'.format(model.lower()))
 
-		net = model_zoo.get_model(model_name, pretrained=False, ctx=gpu(0))
-		net.initialize(force_reinit=True, ctx=gpu(0))
+		net = model_zoo.get_model(model_name, pretrained=False, ctx=mx.cpu())
+		net.initialize(force_reinit=True, ctx=mx.cpu())
 		net.reset_class(classes=self.classes)
-		net.load_parameters(model_path, ctx=gpu(0))
+		net.load_parameters(model_path, ctx=mx.cpu())
 		self.net = net
 
 
@@ -159,16 +159,12 @@ cam=Kinect()
 rospack=rospkg.RosPack()
 path=rospack.get_path("real_time_grasp")
 det=Detector(path + "/scripts/detection_pkg/model.params")
-pub1 = rospy.Publisher('point1', Point, queue_size=10)
-pub2 = rospy.Publisher('point2', Point, queue_size=10)
 arraypub = rospy.Publisher('sdd_points_array', Int32MultiArray, queue_size=10)
 ssd_img_pub = rospy.Publisher('ssd/img/bouding_box', Image, queue_size=1)
 rospy.Subscriber("/camera/color/image_raw", Image, cam.set_image)
 rate = rospy.Rate(10) # 10hz
 points_to_send = Int32MultiArray()
 while not rospy.is_shutdown():
-	#im=cv2.imread("cam.png")
-	#im=cv2.cvtColor(im,cv2.COLOR_BGR2RGB)
 	
 	if cam.has_image > 0:
 		im=cam.image
@@ -199,9 +195,7 @@ while not rospy.is_shutdown():
 					img=caixas.draw(im)
 					cv2.circle(img,(int(caixas[i].x1),int(caixas[i].y1)), 2, (0,0,255), -1)
 					cv2.circle(img,(int(caixas[i].x2),int(caixas[i].y2)), 2, (0,0,255), -1)
-					# cv2.imshow('image',img)
-					# cv2.waitKey(1)
-				
+									
 					ssd_img_pub.publish(CvBridge().cv2_to_imgmsg(img, 'bgr8'))
 				i+=1
 			points_to_send.data = points_to_send_list # assign the array with the value you want to send

@@ -21,11 +21,11 @@
 <a name="1.0"></a>
 ### 1.0 - Authors
 
-- Caio Viturino* - engcaiobarros@gmail.com
+- Caio Viturino* - [[Lattes](http://lattes.cnpq.br/4355017524299952)] [[Linkedin](https://www.linkedin.com/in/engcaiobarros/)] - engcaiobarros@gmail.com
 - Daniel M. de Oliveira* - danielmoura@ufba.br
 - Cézar Bieniek Lemos* - cezarcbl@protonmail.com
-- André Gustavo Scolari Conceição* - andre.gustavo@ufba.br
-- Kleber de Lima Santana Filho - engkleberf@gmail.com
+- André Gustavo Scolari Conceição* - [[Lattes](http://lattes.cnpq.br/6840685961007897)] - andre.gustavo@ufba.br
+- Kleber de Lima Santana Filho - [[Lattes](http://lattes.cnpq.br/3942046874020315)] [[Linkedin](https://www.linkedin.com/in/engkleberfilho/)] - engkleberf@gmail.com
 
 *LaR - Laboratório de Robótica, Departamento de Engenharia Elétrica e de Computação, Universidade Federal da Bahia, Salvador, Brasil
 
@@ -92,78 +92,55 @@ git install -e .
 Download the [model2.params](https://drive.google.com/file/d/1NamkTraRxDBBKDzN5p5D1lCBShqOHp36/view?usp=sharing) in the following link and move it to the `detection_pkg` folder.
 
 <a name="4.0"></a>
-### 4.0 - Run GGCNN and SSD512 in Gazebo and RVIZ
+### 4.0 - Run SSGG-CNN in Gazebo
+Please follow each following steps:
 
-Launch Gazebo first:
-obs: The robot may not start correctly due to a hack method used to set initial joint positions in Gazebo as mentioned in this [issue](https://github.com/ros-simulation/gazebo_ros_pkgs/issues/93#). If it happens, try to restart Gazebo.
-`bico` is a parameter that loads a 3D part in order to test the proposed method. We are not allowed to share this STL file since it is part of a private project. Therefore you will not be able to run the SSD512 net with the pre-trained `bico` part.
+#### 4.1 - Launch Gazebo:
 ```bash
-roslaunch real_time_grasp gazebo_ur5.launch bico:=true
+roslaunch real_time_grasp gazebo_ur5.launch
 ```
 
-Run this node and let the UR5 robot move to the front of the 3D printer. Then launch the next node (SSD512 node). 
-The arm will only perform the grasp after the GGCNN node is running.
+#### 4.2 - Run the UR5 control node 
 ```bash
-rosrun real_time_grasp command_GGCNN_ur5.py --gazebo
+rosrun real_time_grasp ur5_open_loop.py --gazebo
 ```
+Press enter until the following message appears and jump to the next step:
+"==== Press enter to move the robot to the 'depth cam shot' position!
+"
 
-Start the SSD512 detection node. This node is responsible for detecting the object to be filtered.
-```bash
-roslaunch real_time_grasp detection.launch
-```
-
-Launch RVIZ if you want to see the frame (object_detected) corresponding to the object detected by GGCNN and the point cloud.
-In order to see the point cloud, please add pointcloud2 into the RVIZ and select the correct topic:
-```bash
-roslaunch real_time_grasp rviz_ur5.launch
-```
-
-Run the GGCNN. This node will publish a frame corresponding to the object detected by the GGCNN.
-```bash
-rosrun real_time_grasp SSD512_GGCNN.py
-```
-
-Running the following command will speed up the Gazebo simulation a little bit :)
+#### 4.3 - Change the Gazebo properties (OPTIONAL)
+It will speed up your Gazebo simulation a little bit :)
 ```bash
 rosrun real_time_grasp change_gazebo_properties.py
 ```
 
+#### 4.4 - Spawn the objects in the workspace
+```bash
+rosrun real_time_grasp spawn_objects.py
+```
+
+#### 4.5 - Run the SSD node
+```bash
+rosrun real_time_grasp main.py
+```
+
+#### 4.6 - Run the GG-CNN node
+```bash
+rosrun real_time_grasp run_ggcnn.py --ssggcnn
+```
+
+#### 4.7 - UR5 control node
+After running the GG-CNN node you are able to move the robot and perform the grasp.
+Press enter to complete each related task specified in ur5_open_loop.py
+
+#### 4.8 - Visualize the images published by the GG-CNN
 You might want to see the grasp or any other image. In order to do that, you can use the rqt_image_view.
 ```bash
 rosrun rqt_image_view
 ```
 
-<a name="5.0"></a>
-### 5.0 - Connecting with the real UR5
-
-Use the following command in order to connect with the real UR5.
-If you are using velocity control, do not use bring_up. Use ur5_ros_control instead.
-
-```
-roslaunch real_time_grasp ur5_ros_control.launch robot_ip:=192.168.131.13
-```
-
-Launch the real Intel Realsense D435
-```
-roslaunch real_time_grasp rs_d435_camera.launch
-```
-
-Launch the gripper control node
-```
-rosrun robotiq_2f_gripper_control Robotiq2FGripperRtuNode.py /dev/ttyUSB0
-```
-
-Launch the GG-CNN node
-```
-rosrun real_time_grasp run_ggcnn_ur5.py --real
-```
-
-Launch the main node of the Intel Realsense D435
-```
-rosrun real_time_grasp command_GGCNN_ur5.py
-```
-
-If you want to visualize the depth cloud, you can launch RVIZ
-```
-roslaunch real_time_grasp rviz_ur5.launch
+#### 4.9 - Visualize depth cloud in RVIZ
+If you want to visualize the data being published by the Intel Realsense D435 please run the following node:
+```bash
+rosrun real_time_grasp rviz_ur5.launch
 ```
