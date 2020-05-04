@@ -1,3 +1,6 @@
+
+## Single Shot Generative Grasping Convolutional Neural Network (SSGG-CNN)
+
 <p align="center">
 <a href="https://www.youtube.com/watch?v=_uEvq0K7n-Q" target="_blank">
 <img src="https://user-images.githubusercontent.com/28100951/80933477-49bfad80-8d9a-11ea-888c-16b51b39562e.png" width="600">
@@ -8,22 +11,33 @@
 
 <a id="top"></a>
 ### Contents
-1. [Description](#1.0)
-2. [Required packages - Kinetic Version](#2.0)
-3. [Run GGCNN in Gazebo and RVIZ](#3.0)
-4. [Connecting with the real UR5](#4.0)
+1. [Authors](#1.0)
+2. [Description](#2.0)
+3. [Required packages - Kinetic Version](#3.0)
+4. [Run GGCNN in Gazebo and RVIZ](#4.0)
+5. [Connecting with the real UR5](#5.0)
 
 ------------
-
 <a name="1.0"></a>
-### 1.0 - Description
+### 1.0 - Authors
+
+- Caio Viturino* - engcaiobarros@gmail.com
+- Daniel M. de Oliveira* - danielmoura@ufba.br
+- Cézar Bieniek Lemos* - cezarcbl@protonmail.com
+- André Gustavo Scolari Conceição* - andre.gustavo@ufba.br
+- Kleber de Lima Santana Filho - engkleberf@gmail.com
+
+*LaR - Laboratório de Robótica, Departamento de Engenharia Elétrica e de Computação, Universidade Federal da Bahia, Salvador, Brasil
+
+<a name="2.0"></a>
+### 2.0 - Description
 
 This paper proposes a two-step cascaded system with the [Generative Grasping Convolutional Neural Network (GG-CNN)](https://github.com/dougsm/ggcnn_kinova_grasping) and the [Single Shot Multibox Detector architecture (SSD)](https://github.com/czrcbl/train_detection) to perform grasping in a vision-based object recognition system. We call the proposed method as Single Shot Generative Grasping Neural Network (SSGG-CNN). The GG-CNN is a powerful object-independent grasping synthesis method well-known for the outstanding performance in open-loop and closed-loop systems using a pixel-wise grasp quality prediction. However, it is not capable of distinguishing between manipulable objects and fixed objects in the workspace. In order to mitigate this problem, the SSD was adopted to perform object detection. It allows the grasping system to perform the grasp only in manipulable objects identified by the SSD. We found an average success rate of 85% over 20 grasps attempts considering open-loop with static and uncluttered objects randomly organized on a planar surface. 
 
 The [GGCNN](https://github.com/dougsm/ggcnn_kinova_grasping) was created by *[Douglas Morrison](http://dougsm.com), [Peter Corke](http://petercorke.com), [Jürgen Leitner](http://juxi.net)* (2018).
 
-<a name="2.0"></a>
-### 2.0 - Required packages - Kinetic Version
+<a name="3.0"></a>
+### 3.0 - Required packages - Kinetic Version
 
 This code was developed with Python 2.7 on Ubuntu 16.04 with ROS Kinetic.
 
@@ -77,8 +91,8 @@ git install -e .
 
 Download the [model2.params](https://drive.google.com/file/d/1NamkTraRxDBBKDzN5p5D1lCBShqOHp36/view?usp=sharing) in the following link and move it to the `detection_pkg` folder.
 
-<a name="3.0"></a>
-### 3.0 - Run GGCNN and SSD512 in Gazebo and RVIZ
+<a name="4.0"></a>
+### 4.0 - Run GGCNN and SSD512 in Gazebo and RVIZ
 
 Launch Gazebo first:
 obs: The robot may not start correctly due to a hack method used to set initial joint positions in Gazebo as mentioned in this [issue](https://github.com/ros-simulation/gazebo_ros_pkgs/issues/93#). If it happens, try to restart Gazebo.
@@ -119,8 +133,8 @@ You might want to see the grasp or any other image. In order to do that, you can
 rosrun rqt_image_view
 ```
 
-<a name="4.0"></a>
-### 4.0 - Connecting with the real UR5
+<a name="5.0"></a>
+### 5.0 - Connecting with the real UR5
 
 Use the following command in order to connect with the real UR5.
 If you are using velocity control, do not use bring_up. Use ur5_ros_control instead.
