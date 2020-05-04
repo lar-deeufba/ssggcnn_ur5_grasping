@@ -9,29 +9,35 @@
 1. [Description](#1.0)
 2. [Required packages - Kinetic Version](#2.0)
 3. [Run GGCNN in Gazebo and RVIZ](#3.0)
-4. [Sending commands through the action server](#4.0)
-5. [Connecting with real UR5](#5.0)
-6. [To do](#7.0)
+4. [Connecting with real UR5](#4.0)
 
 ------------
 
 <a name="1.0"></a>
-### 1.0 Description
+### 1.0 - Description
 
 This repository was created in order to develop an improved version of the [GGCNN]((https://github.com/dougsm/ggcnn_kinova_grasping)) Grasp Method created by Doug Morrison (2018).
 
 > **_NOTE:_**  This package should be placed into your src folder. Please open an issue if you find any problem related to this package.
 
 <a name="2.0"></a>
-### 2.0 Required packages - Kinetic Version
+### 2.0 - Required packages - Kinetic Version
 
-> **_NOTE:_** Please access the grasp_project repository in order to check the required packages in the '2.0 Required packages' section. The same packages are used in this repository. You do not need to clone grasp_project repository.
-
-- [grasp_project](https://github.com/caiobarrosv/grasp_project) - Created by Caio Viturino
+- [Realsense Gazebo Plugin](https://github.com/pal-robotics/realsense_gazebo_plugin)
+- [Realsense-ros](https://github.com/IntelRealSense/realsense-ros) Release version 2.2.11
+- [Librealsense](https://github.com/IntelRealSense/librealsense) Release version 2.31.0 - Install from source
+- [Moveit Kinetic](https://moveit.ros.org/install/)
+- [Moveit Python](https://github.com/mikeferguson/moveit_python)
+- [Robotiq Gripper](https://github.com/crigroup/robotiq)
+- [Universal Robot](https://github.com/ros-industrial/universal_robot)
+- [ur_modern_driver](https://github.com/ros-industrial/ur_modern_driver)
+- [Gluoncv](https://github.com/dmlc/gluon-cv)
+- [Opencv](https://github.com/opencv/opencv)
+- [Mxnet](https://mxnet.apache.org/) Install Mxnet for your CUDA version.
 
 #### Easy install
 
-In order to install all the required packages easily, create a catkin workspace folder and then a src inside it.
+In order to install all the required packages easily, create a new catkin workspace
 ```bash
 mkdir -p ~/catkin_ws_new/src
 ```
@@ -46,7 +52,7 @@ Run the install.sh file
 ```bash
 cd ~/catkin_ws_new/src/real_time_grasp/install
 sudo chmod +x ./install.sh
-./install.sh #without sudo
+./install.sh
 ```
 
 #### This repository also need the SSD512 implementation created by [czrcbl](https://github.com/czrcbl). Please follow the next procedures provided by him.
@@ -65,10 +71,10 @@ cd bboxes
 git install -e .
 ```
 
-[Download](https://drive.google.com/file/d/1NamkTraRxDBBKDzN5p5D1lCBShqOHp36/view?usp=sharing) the model2.params in the following link and move it to the `detection_pkg` folder.
+Download the [model2.params](https://drive.google.com/file/d/1NamkTraRxDBBKDzN5p5D1lCBShqOHp36/view?usp=sharing) in the following link and move it to the `detection_pkg` folder.
 
 <a name="3.0"></a>
-### 3.0 Run GGCNN and SSD512 in Gazebo and RVIZ
+### 3.0 - Run GGCNN and SSD512 in Gazebo and RVIZ
 
 Launch Gazebo first:
 obs: The robot may not start correctly due to a hack method used to set initial joint positions in gazebo as mentioned in this [issue](https://github.com/ros-simulation/gazebo_ros_pkgs/issues/93#). If it happens, try to restart gazebo.
@@ -115,26 +121,7 @@ rosrun rqt_image_view
 ```
 
 <a name="4.0"></a>
-### 4.0 Sending commands through the action server
-
-If you want to test the position controller sending commands directly to the /'controller_command'/command topic use
-the following:
-
-```bash
-rostopic pub -1 /pos_based_pos_traj_controller/command trajectory_msgs/JointTrajectory "header:
-  seq: 0
-  stamp:
-    secs: 0
-    nsecs: 0
-  frame_id: ''
-joint_names: ['shoulder_pan_joint', 'shoulder_lift_joint', 'elbow_joint', 'wrist_1_joint', 'wrist_2_joint', 'wrist_3_joint']
-points:
-  - positions: [1.57, 0, 0, 0, 0, 0]
-    time_from_start: {secs: 1, nsecs: 0}"
-```
-
-<a name="5.0"></a>
-### 5.0 Connecting with real UR5
+### 4.0 - Connecting with real UR5
 
 Use the following command in order to connect with real UR5.
 If you are using velocity control, do not use bring_up. Use ur5_ros_control instead.
@@ -167,28 +154,3 @@ If you want to visualize the depth or point cloud, you can launch RVIZ
 ```
 roslaunch real_time_grasp rviz_ur5.launch
 ```
-
-Firstly check the machine IP. The IP configured on the robot must have the last digit different.
-
-```bash
-ifconfig
-```
-
-Disable firewall
-
-```bash
-sudo ufw disable
-```
-
-Set up a static IP on UR5 according to the following figure
-
-![config](https://user-images.githubusercontent.com/28100951/71323978-2ca7d380-24b8-11ea-954c-940b009cfd93.jpg)
-
-Set up a connection on Ubuntu according to the following figure
-
-![config_ethernet2](https://user-images.githubusercontent.com/28100951/71323962-fe29f880-24b7-11ea-86dc-756729932de4.jpg)
-
-<a name="6.0"></a>
-### 6.0 To do
-#### April/20
-- [] TBD
