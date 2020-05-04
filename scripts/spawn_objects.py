@@ -41,7 +41,7 @@ def uncluttered_objects():
 	rospy.wait_for_service("gazebo/spawn_sdf_model")
 	model_coordinates = rospy.ServiceProxy('/gazebo/get_model_state', GetModelState)
 	
-	Home = rospack.get_path('real_time_grasp')
+	Home = rospack.get_path('ssggcnn_ur5_grasping')
 
 	bico_dosador = Home + '/models/bico_dosador/model.sdf'
 	little_bin_box = Home + '/models/little_bin_box/model.sdf'

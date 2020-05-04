@@ -36,7 +36,6 @@ PICKING = False # Tells the node that the object must follow the gripper
 def parse_args():
 	parser = argparse.ArgumentParser(description='AAPF_Orientation')
 	parser.add_argument('--gazebo', action='store_true', help='Set the parameters related to the simulated enviroonment in Gazebo')
-	parser.add_argument('--ggcnn', action='store_true', help='Adapt some parameters to SSGGCNN')
 	args = parser.parse_args()
 	return args
 
@@ -87,20 +86,15 @@ class vel_control(object):
 			print "Connected to server (gripper_controller_pos)"
 			
 		# GGCNN
-		self.joint_values_ggcnn = []
 		self.posCB = []
 		self.ori = []
 		self.grasp_cartesian_pose = []
 		self.gripper_angle_grasp = 0.0
 		self.final_orientation = 0.0
-		if self.args.gazebo and not self.args.ggcnn:
+		if self.args.gazebo:
 			self.offset_x = 0.0
 			self.offset_y = 0.0
 			self.offset_z = 0.020 #0.019
-		elif self.args.gazebo and self.args.ggcnn:
-			self.offset_x = 0.0
-			self.offset_y = 0.0
-			self.offset_z = 0.014 #0.019			
 		else:
 			self.offset_x = -0.03 # 0.002
 			self.offset_y = 0.02 # -0.05
@@ -172,12 +166,16 @@ class vel_control(object):
 		self.delete_model_service(model)
 
 	def ur5_actual_position_callback(self, joint_values_from_ur5):
-		"""
+		"""Get UR5 joint angles
+		
 		The joint states published by /joint_staes of the UR5 robot are in wrong order.
 		/joint_states topic normally publishes the joint in the following order:
 		[elbow_joint, shoulder_lift_joint, shoulder_pan_joint, wrist_1_joint, wrist_2_joint, wrist_3_joint]
 		But the correct order of the joints that must be sent to the robot is:
 		['shoulder_pan_joint', 'shoulder_lift_joint', 'elbow_joint', 'wrist_1_joint', 'wrist_2_joint', 'wrist_3_joint']
+		
+		Arguments:
+			joint_values_from_ur5 {list} -- Actual angles of the UR5 Robot
 		"""
 		if self.args.gazebo:
 			self.th3, self.robotic, self.th2, self.th1, self.th4, self.th5, self.th6 = joint_values_from_ur5.position
@@ -207,12 +205,12 @@ class vel_control(object):
 
 		br = TransformBroadcaster()
 		br.sendTransform((object_pose[0], 
-                               object_pose[1],
-                               object_pose[2]), 
-                               quaternion_from_euler(0.0, 0.0, self.ori),
-                               rospy.Time.now(),
-                               "object_link",
-                               "base_link")
+							   object_pose[1],
+							   object_pose[2]), 
+							   quaternion_from_euler(0.0, 0.0, self.ori),
+							   rospy.Time.now(),
+							   "object_link",
+							   "base_link")
 		
 	def get_link_position_picking(self):
 		link_name = self.string
@@ -244,6 +242,7 @@ class vel_control(object):
 		Returns:
 			sol {list} -- Joint angles or None if track_ik is not able to find a valid solution
 		"""
+
 		camera_support_angle_offset = 0.0
 		
 		q = quaternion_from_euler(0.0, -3.14 + camera_support_angle_offset, 0.0)
@@ -267,8 +266,17 @@ class vel_control(object):
 		return goal
 
 	def traj_planner(self, cart_pos, grasp_step='move', way_points_number=10, movement='slow'):
-		"""
-		Quintic polynomial trajectory
+		"""Quintic Trajectory Planner
+		
+		Publish a trajectory to UR5 using quintic splines. 
+		
+		Arguments:
+			cart_pos {[float]} -- Grasp position [x, y, z]
+		
+		Keyword Arguments:
+			grasp_step {str} -- Set UR5 movement type (default: {'move'})
+			way_points_number {number} -- Number of points considered in trajectory (default: {10})
+			movement {str} -- Movement speed (default: {'slow'})
 		"""
 		
 		if grasp_step == 'pregrasp':
@@ -331,9 +339,18 @@ class vel_control(object):
 		
 	
 	def all_close(self, goal, tolerance=0.00005):
-		"""
+		"""Wait until goal is reached in configuration space
+		
 		This method check if the robot reached goal position since wait_for_result seems to be broken
+
+		
+		Arguments:
+			goal {[list]} -- Goal in configuration space (joint values)
+		
+		Keyword Arguments:
+			tolerance {number} -- Minimum error allowed to consider the trajectory completed (default: {0.00005})
 		"""
+
 		error = np.sum([(self.actual_position[i] - goal[i])**2 for i in range(6)])
 		rospy.loginfo("Waiting for trajectory.")
 		while not rospy.is_shutdown() and error > tolerance:
@@ -344,8 +361,9 @@ class vel_control(object):
 			rospy.logerr("Trajectory aborted.")
 
 	def genCommand(self, char, command, pos=None):
-		"""Update the command according to the character entered by the user."""    
-
+		"""
+		Update the command according to the character entered by the user.
+		"""
 		if char == 'a':
 			# command = outputMsg.Robotiq2FGripper_robot_output();
 			command.rACT = 1 # Gripper activation
@@ -389,6 +407,14 @@ class vel_control(object):
 		self.pub_gripper_command.publish(command)  
 
 	def gripper_send_position_goal(self, position=0.3, velocity=0.4, action='move'):
+		"""Send position goal to the gripper
+		
+		Keyword Arguments:
+			position {float} -- Gripper angle (default: {0.3})
+			velocity {float} -- Gripper velocity profile (default: {0.4})
+			action {str} -- Gripper movement (default: {'move'})
+		"""
+
 		self.turn_gripper_position_controller_on()
 		duration = 0.2
 		if action == 'pre_grasp_angle':

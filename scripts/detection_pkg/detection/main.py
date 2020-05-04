@@ -47,7 +47,7 @@ class TimeIt:
         print('%s: %s' % (self.s, self.t1 - self.t0))
 
 class Detector:
-	def __init__(self, model_path, model='ssd512', ctx='cpu', classes='normal'):
+	def __init__(self, model_path, model='ssd512', ctx='gpu', classes='normal'):
 		if classes == 'normal':
 			self.classes = cfg.CLASSES
 		elif classes == 'grasp':
@@ -88,10 +88,10 @@ class Detector:
 		else:
 			raise ValueError('Invalid model `{}`.'.format(model.lower()))
 
-		net = model_zoo.get_model(model_name, pretrained=False, ctx=mx.cpu())
-		net.initialize(force_reinit=True, ctx=mx.cpu())
+		net = model_zoo.get_model(model_name, pretrained=False, ctx=mx.gpu(0))
+		net.initialize(force_reinit=True, ctx=mx.gpu(0))
 		net.reset_class(classes=self.classes)
-		net.load_parameters(model_path, ctx=mx.cpu())
+		net.load_parameters(model_path, ctx=mx.gpu(0))
 		self.net = net
 
 
@@ -157,7 +157,7 @@ class Detector:
 rospy.init_node('talker', anonymous=True)
 cam=Kinect()
 rospack=rospkg.RosPack()
-path=rospack.get_path("real_time_grasp")
+path=rospack.get_path("ssggcnn_ur5_grasping")
 det=Detector(path + "/scripts/detection_pkg/model.params")
 arraypub = rospy.Publisher('sdd_points_array', Int32MultiArray, queue_size=10)
 ssd_img_pub = rospy.Publisher('ssd/img/bouding_box', Image, queue_size=1)

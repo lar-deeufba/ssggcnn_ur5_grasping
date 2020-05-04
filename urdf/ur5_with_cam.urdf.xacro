@@ -6,18 +6,18 @@
   <xacro:arg name="load_table" default="false"/>
 
   <!-- Gazebo plugin -->
-  <xacro:include filename="$(find real_time_grasp)/urdf/plugin.gazebo.xacro"/>
+  <xacro:include filename="$(find ssggcnn_ur5_grasping)/urdf/plugin.gazebo.xacro"/>
 
   <!-- Robotiq gripper -->
   <xacro:include filename="$(find robotiq_description)/urdf/robotiq_85_gripper.urdf.xacro"/>
 
   <!-- ur5 -->
-  <xacro:include filename="$(find real_time_grasp)/urdf/ur5.urdf.xacro"/>
+  <xacro:include filename="$(find ssggcnn_ur5_grasping)/urdf/ur5.urdf.xacro"/>
 
   <!-- It is necessary to change the hardware interface on the fly -->
-  <xacro:include filename="$(find real_time_grasp)/urdf/ur5.transmission.xacro"/>
+  <xacro:include filename="$(find ssggcnn_ur5_grasping)/urdf/ur5.transmission.xacro"/>
 
-  <xacro:include filename="$(find real_time_grasp)/urdf/_d435.urdf.xacro" />
+  <xacro:include filename="$(find ssggcnn_ur5_grasping)/urdf/_d435.urdf.xacro" />
 
   <!-- arm -->
   <xacro:ur5_robot prefix="" joint_limited="false" transmission_hw_interface="$(arg transmission_hw_interface)"/>
@@ -62,7 +62,7 @@
       <!-- The cam is rotated 14 degrees (0.24rad) through the yaw axis -->
       <origin rpy="${1.57 - 0.244} ${3.14} -1.57" xyz="${0.002 - 0.03} ${-0.023 + 0.03 - 0.01} ${0.13915-0.205}"/>
       <geometry>
-        <mesh filename="package://real_time_grasp/models/cam_support/CAM_support.STL" scale="0.001 0.001 0.001"/>
+        <mesh filename="package://ssggcnn_ur5_grasping/models/cam_support/CAM_support.STL" scale="0.001 0.001 0.001"/>
       </geometry>
       <material name="Cyan">
         <color rgba="0.91 0.91 0.88 1.0"/>

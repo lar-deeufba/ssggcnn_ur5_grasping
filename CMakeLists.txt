@@ -1,10 +1,9 @@
 cmake_minimum_required(VERSION 2.8.3)
-project(real_time_grasp)
+project(ssggcnn_ur5_grasping)
 
 find_package(catkin REQUIRED COMPONENTS
   pcl_conversions
   pcl_ros
-  message_generation
   gazebo_ros
   roscpp
   rospy
@@ -22,12 +21,6 @@ find_package(OpenCV REQUIRED)
 #  FILES
 #)
 
-generate_messages(
-  DEPENDENCIES
-  std_msgs
-  sensor_msgs
-)
-
 catkin_package(CATKIN_DEPENDS message_runtime)
 
 
@@ -41,9 +34,5 @@ include_directories(
   ${OpenCV_INCLUDE_DIRS}
   ${GAZEBO_INCLUDE_DIRS}
 )
-
-add_executable(main scripts/pcl_sim/main.cpp)
-target_link_libraries(main ${catkin_LIBRARIES} ${OpenCV_LIBS})
-add_dependencies(main pcl_sim_generate_messages_cpp)
 
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++1y -g -O3")

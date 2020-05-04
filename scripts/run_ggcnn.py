@@ -58,7 +58,7 @@ class ssgg_grasping(object):
 
         # Load the Network.
         rospack = rospkg.RosPack()
-        Home = rospack.get_path('real_time_grasp')
+        Home = rospack.get_path('ssggcnn_ur5_grasping')
         MODEL_FILE = Home + '/data/epoch_29_model.hdf5'
         with tf.device('/device:GPU:0'):
             self.model = load_model(MODEL_FILE)

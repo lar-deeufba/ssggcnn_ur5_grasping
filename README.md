@@ -65,12 +65,12 @@ mkdir -p ~/catkin_ws_new/src
 Clone this repository into the src folder
 ```bash
 cd ~/catkin_ws_new/src
-git clone https://github.com/lar-deeufba/real_time_grasp
+git clone https://github.com/lar-deeufba/ssggcnn_ur5_grasping
 ```
 
 Run the install.sh file
 ```bash
-cd ~/catkin_ws_new/src/real_time_grasp/install
+cd ~/catkin_ws_new/src/ssggcnn_ur5_grasping/install
 sudo chmod +x ./install.sh
 ./install.sh
 ```
@@ -97,12 +97,12 @@ Please follow each following steps:
 
 #### 4.1 - Launch Gazebo:
 ```bash
-roslaunch real_time_grasp gazebo_ur5.launch
+roslaunch ssggcnn_ur5_grasping gazebo_ur5.launch
 ```
 
 #### 4.2 - Run the UR5 control node 
 ```bash
-rosrun real_time_grasp ur5_open_loop.py --gazebo
+rosrun ssggcnn_ur5_grasping ur5_open_loop.py --gazebo
 ```
 Press enter until the following message appears and jump to the next step:
 "==== Press enter to move the robot to the 'depth cam shot' position!
@@ -111,22 +111,22 @@ Press enter until the following message appears and jump to the next step:
 #### 4.3 - Change the Gazebo properties (OPTIONAL)
 It will speed up your Gazebo simulation a little bit :)
 ```bash
-rosrun real_time_grasp change_gazebo_properties.py
+rosrun ssggcnn_ur5_grasping change_gazebo_properties.py
 ```
 
 #### 4.4 - Spawn the objects in the workspace
 ```bash
-rosrun real_time_grasp spawn_objects.py
+rosrun ssggcnn_ur5_grasping spawn_objects.py
 ```
 
 #### 4.5 - Run the SSD node
 ```bash
-rosrun real_time_grasp main.py
+rosrun ssggcnn_ur5_grasping main.py
 ```
 
 #### 4.6 - Run the GG-CNN node
 ```bash
-rosrun real_time_grasp run_ggcnn.py --ssggcnn
+rosrun ssggcnn_ur5_grasping run_ggcnn.py --ssggcnn
 ```
 
 #### 4.7 - UR5 control node
@@ -142,5 +142,5 @@ rosrun rqt_image_view
 #### 4.9 - Visualize depth cloud in RVIZ
 If you want to visualize the data being published by the Intel Realsense D435 please run the following node:
 ```bash
-rosrun real_time_grasp rviz_ur5.launch
+rosrun ssggcnn_ur5_grasping rviz_ur5.launch
 ```

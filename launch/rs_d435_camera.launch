@@ -120,11 +120,11 @@ Processing enabled by this node:
   # Load Param
   ########################################
   <!-- Load joint names into the parameter server -->
-  <rosparam file="$(find real_time_grasp)/config/joint_names.yaml" command="load" />
+  <rosparam file="$(find ssggcnn_ur5_grasping)/config/joint_names.yaml" command="load" />
   
   <!-- Launch GGCNN parameters -->
   <group ns="GGCNN">
-    <rosparam file="$(find real_time_grasp)/config/ggcnn_param.yaml" />
+    <rosparam file="$(find ssggcnn_ur5_grasping)/config/ggcnn_param.yaml" />
   </group>
 
   <group ns="$(arg camera)">
