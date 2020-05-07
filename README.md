@@ -2,7 +2,7 @@
 ## Single Shot Generative Grasping Convolutional Neural Network (SSGG-CNN)
 
 <p align="center">
-<a href="https://www.youtube.com/watch?v=_uEvq0K7n-Q" target="_blank">
+<a href="https://youtu.be/aJ39MruDdLo" target="_blank">
 <img src="https://user-images.githubusercontent.com/28100951/80933477-49bfad80-8d9a-11ea-888c-16b51b39562e.png" width="600">
 </p>
 </a>
