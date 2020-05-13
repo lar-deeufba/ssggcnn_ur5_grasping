@@ -91,7 +91,7 @@ cd bboxes
 git install -e .
 ```
 
-Download the [model2.params](https://drive.google.com/file/d/1NamkTraRxDBBKDzN5p5D1lCBShqOHp36/view?usp=sharing) in the following link and move it to the `detection_pkg` folder.
+Download the [model.params](https://drive.google.com/open?id=1NdoknYGaaReDcmeLYm6bUe6ksv84ueOo) in the following link and move it to the `scripts/detection_pkg` folder.
 
 <a name="4.0"></a>
 ### 4.0 - Run SSGG-CNN in Gazebo
