@@ -103,37 +103,38 @@ roslaunch ssggcnn_ur5_grasping gazebo_ur5.launch
 ```
 
 #### 4.2 - Run the UR5 control node 
+Press enter after the following message appears and jump to the step 4.3:
+"==== Press enter to move the robot to the 'depth cam shot' position!"
 ```bash
 rosrun ssggcnn_ur5_grasping ur5_open_loop.py --gazebo
 ```
-Press enter until the following message appears and jump to the next step:
-"==== Press enter to move the robot to the 'depth cam shot' position!
-"
 
-#### 4.3 - Change the Gazebo properties (OPTIONAL)
-It will speed up your Gazebo simulation a little bit :)
-```bash
-rosrun ssggcnn_ur5_grasping change_gazebo_properties.py
-```
-
-#### 4.4 - Spawn the objects in the workspace
-```bash
-rosrun ssggcnn_ur5_grasping spawn_objects.py
-```
-
-#### 4.5 - Run the SSD node
+#### 4.3 - Run the SSD node
 ```bash
 rosrun ssggcnn_ur5_grasping main.py
 ```
 
-#### 4.6 - Run the GG-CNN node
+#### 4.4 - Run the GG-CNN node
+Press enter after the following message appears and jump to the step 4.5:
+"Press enter to start the GGCNN"
 ```bash
 rosrun ssggcnn_ur5_grasping run_ggcnn.py --ssggcnn
 ```
 
-#### 4.7 - UR5 control node
+#### 4.5 - Spawn the objects in the workspace
+```bash
+rosrun ssggcnn_ur5_grasping spawn_objects.py
+```
+
+#### 4.6 - UR5 control node
 After running the GG-CNN node you are able to move the robot and perform the grasp.
 Press enter to complete each related task specified in ur5_open_loop.py
+
+#### 4.7 - Change the Gazebo properties (OPTIONAL)
+It will speed up your Gazebo simulation a little bit :)
+```bash
+rosrun ssggcnn_ur5_grasping change_gazebo_properties.py
+```
 
 #### 4.8 - Visualize the images published by the GG-CNN
 You might want to see the grasp or any other image. In order to do that, you can use the rqt_image_view.
