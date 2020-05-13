@@ -19,9 +19,18 @@ echo '###### Installing and upgrading pip | pathlib ######'
 sudo apt install python-pip
 pip install --upgrade pip
 pip install pathlib
+
+echo '###### Installing additional Deep L. packages etc ######'
 pip install mxnet-cu00 # please install the mxnet for your cuda version
 pip install gluoncv
 pip install opencv-python
+pip install keras==2.1.5
+pip install Keras-Applications==1.0.8 
+pip install Keras-Preprocessing==1.1.0 
+pip install matplotlib==2.2.4 
+pip install scikit-image==0.14.5 
+pip install h5py==2.10.0
+pip install tensorflow-gpu==1.14.0
 
 echo '###### Cloning the universal_robot package ######'
 git clone -b kinetic-devel https://github.com/ros-industrial/universal_robot ../../universal_robot
