@@ -21,7 +21,7 @@ pip install --upgrade pip
 pip install pathlib
 
 echo '###### Installing additional Deep L. packages etc ######'
-pip install mxnet-cu00 # please install the mxnet for your cuda version
+pip install mxnet-cu100 # please install the mxnet for your cuda version
 pip install gluoncv
 pip install opencv-python
 pip install keras==2.1.5
@@ -64,7 +64,7 @@ sudo apt-get install ros-kinetic-gripper*controller
 
 echo '###### Cloning the realsense-ros package ######'
 sudo apt-get install ros-kinetic-realsense2-camera
-# git clone https://github.com/IntelRealSense/realsense-ros --branch 2.2.11 ../../realsense-ros
+git clone https://github.com/IntelRealSense/realsense-ros --branch 2.2.11 ../../realsense-ros
 
 echo '###### Cloning the realsense_gazebo_plugin package ######'
 git clone https://github.com/pal-robotics/realsense_gazebo_plugin ../../realsense_gazebo_plugin
