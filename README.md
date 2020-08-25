@@ -84,16 +84,12 @@ sudo chmod +x ./install.sh
 
 #### This repository also need the SSD512 implementation created by [czrcbl](https://github.com/czrcbl). Please follow the next procedures provided by the author.
 
-Install bboxes before continuing. You can install directly from `github`:
+Clone and install the following:
 ```bash
-pip install git+https://github.com/czrcbl/bboxes
+git clone --branch ssggcnn https://github.com/czrcbl/bboxes.git
 ```
-
-Or you can clone the repository and install on editable mode:
 ```bash
-git clone https://github.com/czrcbl/bboxes
-cd bboxes
-git install -e .
+git clone --branch ssggcnn https://github.com/czrcbl/detection.git
 ```
 
 Download the [model.params](https://drive.google.com/open?id=1NdoknYGaaReDcmeLYm6bUe6ksv84ueOo) in the following link and move it to the `scripts/detection_pkg` folder.
